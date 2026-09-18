@@ -45,6 +45,75 @@ router.get("/products/:id", (req, res) => {
 router.patch("/products/:id", update("products"));
 router.delete("/products/:id", remove("products"));
 
+// Cart
+router.get("/cart", (_req, res) => res.json(starlineService.getCart()));
+router.post("/cart", (req, res) => {
+  const body = req.body as { productId?: string; quantity?: number };
+  const result = starlineService.addToCart(String(body?.productId ?? ""), Number(body?.quantity ?? 1));
+  if ("error" in result) return res.status(404).json(result);
+  return res.status(201).json(result);
+});
+router.patch("/cart/:id", (req, res) => {
+  const body = req.body as { quantity?: number };
+  const result = starlineService.updateCartQuantity(String(req.params.id), Number(body?.quantity ?? 1));
+  if ("error" in result) return res.status(404).json(result);
+  return res.json(result);
+});
+router.delete("/cart/:id", (req, res) => {
+  if (!starlineService.removeCartItem(String(req.params.id))) return res.status(404).json({ error: "Cart item not found" });
+  return res.status(204).send();
+});
+router.delete("/cart", (_req, res) => {
+  starlineService.clearCart();
+  return res.status(204).send();
+});
+router.get("/cart/breakdown", (req, res) => {
+  const coupon = typeof req.query.coupon === "string" ? req.query.coupon : null;
+  return res.json(starlineService.cartBreakdown(coupon));
+});
+
+// Wishlist
+router.get("/wishlist", (_req, res) => res.json(starlineService.getWishlist()));
+router.post("/wishlist", (req, res) => {
+  const body = req.body as { productId?: string };
+  const result = starlineService.addToWishlist(String(body?.productId ?? ""));
+  if ("error" in result) return res.status(404).json(result);
+  return res.status(201).json(result);
+});
+router.delete("/wishlist/:id", (req, res) => {
+  if (!starlineService.removeFromWishlist(String(req.params.id))) return res.status(404).json({ error: "Wishlist item not found" });
+  return res.status(204).send();
+});
+
+// Checkout
+router.post("/checkout", (req, res) => {
+  const body = req.body as {
+    customer?: string; email?: string; phone?: string; address?: string;
+    city?: string; state?: string; pincode?: string; paymentMethod?: string; couponCode?: string | null;
+  };
+  const result = starlineService.checkout({
+    customer: String(body?.customer ?? ""),
+    email: String(body?.email ?? ""),
+    phone: String(body?.phone ?? ""),
+    address: String(body?.address ?? ""),
+    city: String(body?.city ?? ""),
+    state: String(body?.state ?? ""),
+    pincode: String(body?.pincode ?? ""),
+    paymentMethod: String(body?.paymentMethod ?? "Cash on Delivery"),
+    couponCode: body?.couponCode ?? null,
+  });
+  if ("error" in result) return res.status(400).json(result);
+  return res.status(201).json(result);
+});
+router.get("/orders/:id", (req, res) => {
+  const order = starlineService.getOrder(String(req.params.id));
+  return order ? res.json(order) : res.status(404).json({ error: "Order not found" });
+});
+router.get("/orders", (req, res) => {
+  const customer = typeof req.query.customer === "string" ? req.query.customer : undefined;
+  return res.json(starlineService.listOrders(customer));
+});
+
 router.get("/categories", list("categories"));
 router.post("/categories", create("categories"));
 router.patch("/categories/:id", update("categories"));

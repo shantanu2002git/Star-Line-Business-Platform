@@ -3,12 +3,69 @@ export type StarlineRecord = {
   [key: string]: unknown;
 };
 
+export type CartItem = {
+  id: string;
+  productId: string;
+  name: string;
+  image: string;
+  price: number;
+  originalPrice: number;
+  quantity: number;
+  maxStock: number;
+  addedAt: string;
+};
+
+export type WishlistItem = {
+  id: string;
+  productId: string;
+  name: string;
+  image: string;
+  price: number;
+  addedAt: string;
+};
+
+export type OrderItem = {
+  id: string;
+  name: string;
+  image: string;
+  price: number;
+  originalPrice: number;
+  quantity: number;
+  total: number;
+};
+
+export type Order = {
+  id: string;
+  number: string;
+  customer: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  items: OrderItem[];
+  subtotal: number;
+  discount: number;
+  couponCode: string | null;
+  platformDiscount: number;
+  deliveryCharge: number;
+  packagingCharge: number;
+  tax: number;
+  total: number;
+  status: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  createdAt: string;
+  estimatedDelivery: string;
+};
+
 export type StarlineData = {
   products: StarlineRecord[];
   categories: StarlineRecord[];
   services: StarlineRecord[];
   customers: StarlineRecord[];
-  orders: StarlineRecord[];
+  orders: Order[];
   requests: StarlineRecord[];
   reviews: StarlineRecord[];
   inventory: StarlineRecord[];
@@ -16,6 +73,8 @@ export type StarlineData = {
   banners: StarlineRecord[];
   offers: StarlineRecord[];
   content: StarlineRecord[];
+  cart: CartItem[];
+  wishlist: WishlistItem[];
 };
 
 export const starlineData: StarlineData = {
@@ -23,50 +82,122 @@ export const starlineData: StarlineData = {
     {
       id: "prod-101",
       name: "HP DeskJet 2331",
+      brand: "HP",
+      sku: "HP-2331",
       category: "Printers",
+      tags: ["printer", "all-in-one", "home-office", "compact"],
+      images: ["printer-1", "printer-2", "printer-3", "printer-4"],
       price: 6499,
+      originalPrice: 7499,
+      discount: 13,
+      savings: 1000,
       stock: 12,
       rating: 4.8,
       reviews: 34,
       image: "printer",
       featured: true,
+      deliveryAvailable: true,
+      deliveryDays: 3,
       description: "Compact all-in-one printer for home and small-office work.",
+      features: ["Print, scan, copy", "Wireless connectivity", "Individual ink tanks", "Borderless photo printing"],
+      benefits: ["Save on ink costs", "Set up in minutes", "Print from anywhere"],
+      specifications: { "Model": "DeskJet 2331", "Function": "Print / Scan / Copy", "Connectivity": "USB, Wi-Fi, HP Smart", "Ink Type": "HP 410 Black/Tri-color", "Print Speed": "7.5 ppm black / 5.5 ppm color", "Duty Cycle": "1000 pages/month" },
+      inclusions: ["HP DeskJet 2331 printer", "HP 410 Black Ink Bottle", "HP 410 Tri-color Ink Bottle", "Power cable", "Setup guide"],
+      warranty: "1 year on-site warranty from HP authorized service centers.",
+      returnPolicy: "7 day easy returns. Opened items eligible for replacement only.",
+      faqs: [{ question: "Does it support mobile printing?", answer: "Yes, via HP Smart app on iOS and Android." }, { question: "What ink does it use?", answer: "HP 410 Black and Tri-color ink bottles." }],
+      related: ["prod-104", "prod-103"],
+      recentlyViewed: ["prod-102", "prod-104"],
     },
     {
       id: "prod-102",
       name: "Braided Type-C Cable",
+      brand: "Star Line Essentials",
+      sku: "ACC-TC-01",
       category: "Mobile Accessories",
+      tags: ["cable", "type-c", "fast-charge", "braided"],
+      images: ["cable-1", "cable-2", "cable-3"],
       price: 399,
+      originalPrice: 599,
+      discount: 33,
+      savings: 200,
       stock: 48,
       rating: 4.6,
       reviews: 86,
       image: "cable",
       featured: true,
+      deliveryAvailable: true,
+      deliveryDays: 2,
       description: "Durable fast-charge cable with reinforced connectors.",
+      features: ["60W fast charging", "Braided nylon jacket", "5A current rated", "Reversible connector"],
+      benefits: ["Survives daily tugs", "Charges phones and laptops", "Tangle resistant"],
+      specifications: { "Connector": "USB-C to USB-C", "Length": "1.8 m", "Power Delivery": "Up to 60W", "Data Transfer": "USB 2.0 480 Mbps", "Jacket Material": "Braided nylon" },
+      inclusions: ["1.8 m Braided USB-C Cable"],
+      warranty: "12 month replacement warranty.",
+      returnPolicy: "30 day easy returns for unused items.",
+      faqs: [{ question: "Will it charge my laptop?", answer: "Yes, any USB-C device supporting 60W PD." }, { question: "Is it tangle free?", answer: "The braided nylon jacket resists tangling." }],
+      related: ["prod-103", "prod-101"],
+      recentlyViewed: ["prod-104", "prod-101"],
     },
     {
       id: "prod-103",
       name: "Logitech M185 Mouse",
+      brand: "Logitech",
+      sku: "LOG-M185",
       category: "Computer Accessories",
+      tags: ["mouse", "wireless", "ergonomic", "usb"],
+      images: ["mouse-1", "mouse-2"],
       price: 799,
+      originalPrice: 1099,
+      discount: 27,
+      savings: 300,
       stock: 7,
       rating: 4.5,
       reviews: 21,
       image: "mouse",
       featured: false,
+      deliveryAvailable: true,
+      deliveryDays: 4,
       description: "Reliable wireless mouse for study, work, and travel.",
+      features: ["2.4 GHz wireless", "Ambidextrous design", "1 AA battery included", "Customizable buttons"],
+      benefits: ["Works on any surface", "Long battery life", "Travel friendly"],
+      specifications: { "Model": "M185", "Connectivity": "2.4 GHz USB receiver", "Sensor": "Optical, 1000 dpi", "Buttons": "Left, right, wheel, side", "Battery Life": "Up to 18 months" },
+      inclusions: ["Logitech M185 Mouse", "USB receiver", "1 AA battery", "User documentation"],
+      warranty: "3 year manufacturer warranty.",
+      returnPolicy: "7 day easy returns. Opened items eligible for replacement only.",
+      faqs: [{ question: "Does it need a driver?", answer: "No, plug and play via USB receiver." }, { question: "How long does the battery last?", answer: "Up to 18 months with a single AA battery." }],
+      related: ["prod-102", "prod-104"],
+      recentlyViewed: ["prod-101", "prod-102"],
     },
     {
       id: "prod-104",
       name: "A4 Premium Paper · 500 sheets",
+      brand: "Star Line Paper Co.",
+      sku: "PAPER-A4-75",
       category: "Printing Supplies",
+      tags: ["paper", "a4", "premium", "500-sheets"],
+      images: ["paper-1", "paper-2"],
       price: 349,
+      originalPrice: 449,
+      discount: 22,
+      savings: 100,
       stock: 82,
       rating: 4.9,
       reviews: 59,
       image: "paper",
       featured: false,
+      deliveryAvailable: true,
+      deliveryDays: 2,
       description: "Bright 75 GSM paper for everyday prints and documents.",
+      features: ["75 GSM bright white", "Acid free", "FSC certified", "High opacity"],
+      benefits: ["Crisp text output", "Ideal for duplex printing", "Bulk pack value"],
+      specifications: { "Size": "A4 (210 × 297 mm)", "GSM": "75", "Sheets": "500", "Brightness": "100% ISO", "Finish": "Smooth" },
+      inclusions: ["A4 Premium Paper · 500 sheets"],
+      warranty: "Replacement warranty for damaged packs.",
+      returnPolicy: "7 day easy returns for unopened packs.",
+      faqs: [{ question: "Is it suitable for laser printers?", answer: "Yes, works with inkjet and laser printers." }, { question: "What is the brightness rating?", answer: "100% ISO brightness for crisp output." }],
+      related: ["prod-101", "prod-102"],
+      recentlyViewed: ["prod-103", "prod-102"],
     },
   ],
   categories: [
@@ -190,4 +321,6 @@ export const starlineData: StarlineData = {
     { id: "content-1", key: "about", title: "About Star Line", body: "A dependable local partner for printing, digital help, and everyday tech essentials.", published: true, updatedAt: "2026-09-14" },
     { id: "content-2", key: "hours", title: "Business hours", body: "Monday–Saturday, 9:00 AM–8:00 PM. Sunday, 10:00 AM–4:00 PM.", published: true, updatedAt: "2026-09-10" },
   ],
+  cart: [],
+  wishlist: [],
 };
