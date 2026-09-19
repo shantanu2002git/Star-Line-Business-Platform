@@ -72,6 +72,17 @@ export type Order = {
   estimatedDelivery: string;
 };
 
+export type Notification = {
+  id: string;
+  customer: string;
+  orderId?: string;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  createdAt: string;
+};
+
 export function getCart() {
   return customFetch<CartItem[]>('/api/cart', { responseType: 'json' });
 }
@@ -154,4 +165,12 @@ export function listOrders(customer?: string) {
     customer ? `/api/orders?customer=${encodeURIComponent(customer)}` : '/api/orders',
     { responseType: 'json' },
   );
+}
+
+export function listNotifications(customer = 'Ananya Shah') {
+  return customFetch<Notification[]>(`/api/notifications?customer=${encodeURIComponent(customer)}`, { responseType: 'json' });
+}
+
+export function markNotificationRead(id: string) {
+  return customFetch<Notification>(`/api/notifications/${id}/read`, { method: 'PATCH', responseType: 'json' });
 }
