@@ -1,4 +1,4 @@
-import { starlineData, type StarlineData, type StarlineRecord, type CartItem, type Order, type WishlistItem } from "../data/starline";
+import { starlineData, type StarlineData, type StarlineRecord, type CartItem, type Order, type OrderItem, type WishlistItem, type Notification } from "../data/starline";
 
 type CollectionName = keyof StarlineData;
 type ListOptions = { search?: string; page?: number; pageSize?: number; status?: string; category?: string; featured?: boolean; visibility?: string };
@@ -12,10 +12,10 @@ class StarlineService {
     let items = [...this.data[name]];
     const needle = options.search?.trim().toLowerCase();
     if (needle) items = items.filter((item) => JSON.stringify(item).toLowerCase().includes(needle));
-    if (options.status) items = items.filter((item) => item.status === options.status);
-    if (options.category) items = items.filter((item) => item.category === options.category);
-    if (typeof options.featured === "boolean") items = items.filter((item) => item.featured === options.featured);
-    if (options.visibility) items = items.filter((item) => item.visibility === options.visibility);
+    if (options.status) items = items.filter((item) => (item as Record<string, unknown>).status === options.status);
+    if (options.category) items = items.filter((item) => (item as Record<string, unknown>).category === options.category);
+    if (typeof options.featured === "boolean") items = items.filter((item) => (item as Record<string, unknown>).featured === options.featured);
+    if (options.visibility) items = items.filter((item) => (item as Record<string, unknown>).visibility === options.visibility);
     const page = Math.max(options.page ?? 1, 1);
     const pageSize = Math.min(Math.max(options.pageSize ?? 20, 1), 100);
     const start = (page - 1) * pageSize;
@@ -32,7 +32,7 @@ class StarlineService {
 
   create(name: CollectionName, input: Record<string, unknown>) {
     const item: StarlineRecord = { ...input, id: `${String(name).slice(0, -1)}-${Date.now()}`, ...(name === "requests" ? { reference: `SL-${Math.floor(4000 + Math.random() * 900)}`, submittedAt: now(), status: input.status ?? "Submitted", documents: input.documents ?? [] } : {}), ...(name === "orders" ? { date: now(), status: input.status ?? "Pending" } : {}), ...(name === "invoices" ? { number: `SL-INV-${Math.floor(1000 + Math.random() * 8999)}`, issuedAt: now(), status: input.status ?? "Pending" } : {}), ...(name === "reviews" ? { date: now(), visibility: input.visibility ?? "Pending" } : {}), ...(name === "content" ? { updatedAt: now() } : {}) };
-    this.data[name].unshift(item);
+    (this.data[name] as Array<unknown>).unshift(item);
     return item;
   }
 
@@ -41,6 +41,34 @@ class StarlineService {
     if (index === -1) return undefined;
     this.data[name][index] = { ...this.data[name][index], ...input, id };
     return this.data[name][index];
+  }
+
+  updateOrder(id: string, input: Record<string, unknown>) {
+    const order = this.getOrder(id);
+    if (!order) return undefined;
+    const previousStatus = order.status;
+    Object.assign(order, input, { id });
+    if (input.status && input.status !== previousStatus) this.addNotification(order.customer, { orderId: order.id, title: `Order ${input.status}`, message: `Your order ${order.number} is now ${String(input.status).toLowerCase()}.`, type: "order-status" });
+    return order;
+  }
+
+  updateRequest(id: string, input: Record<string, unknown>) {
+    const request = this.find("requests", id) as Record<string, unknown> | undefined;
+    if (!request) return undefined;
+    const previousStatus = request.status;
+    const updated = this.update("requests", id, input);
+    if (input.status && input.status !== previousStatus) this.addNotification(String(request.customer ?? "Ananya Shah"), { title: "Request status updated", message: `${String(request.service ?? "Your request")} is now ${String(input.status).toLowerCase()}.`, type: "request-status" });
+    return updated;
+  }
+
+  addNotification(customer: string, input: Omit<Notification, "id" | "customer" | "createdAt" | "read">) {
+    const notification: Notification = { ...input, id: `notification-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, customer, read: false, createdAt: new Date().toISOString() };
+    this.data.notifications.unshift(notification);
+    return notification;
+  }
+
+  listNotifications(customer?: string) {
+    return this.data.notifications.filter((item) => !customer || item.customer.toLowerCase() === customer.toLowerCase());
   }
 
   remove(name: CollectionName, id: string) {
@@ -208,6 +236,7 @@ class StarlineService {
       estimatedDelivery: this.addDays(now(), 5),
     };
     this.data.orders.unshift(order);
+    this.addNotification(order.customer, { orderId: order.id, title: "Order placed", message: `Your order ${order.number} was placed successfully.`, type: "order-placed" });
     this.data.cart = [];
     return order;
   }

@@ -24,6 +24,17 @@ export type WishlistItem = {
   addedAt: string;
 };
 
+export type Notification = {
+  id: string;
+  customer: string;
+  orderId?: string;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  createdAt: string;
+};
+
 export type OrderItem = {
   id: string;
   name: string;
@@ -75,6 +86,7 @@ export type StarlineData = {
   content: StarlineRecord[];
   cart: CartItem[];
   wishlist: WishlistItem[];
+  notifications: Notification[];
 };
 
 export const starlineData: StarlineData = {
@@ -255,7 +267,7 @@ export const starlineData: StarlineData = {
     { id: "ORD-2083", customer: "Meera Iyer", items: "A4 Premium Paper × 4", total: 1396, status: "Completed", date: "2026-09-16", payment: "Paid" },
     { id: "ORD-2082", customer: "Nisha Kapoor", items: "Braided Type-C Cable × 2", total: 798, status: "Ready", date: "2026-09-15", payment: "Paid" },
     { id: "ORD-2081", customer: "Rohan Shah", items: "Logitech M185 Mouse × 1", total: 799, status: "Completed", date: "2026-09-14", payment: "Paid" },
-  ],
+  ] as unknown as Order[],
   requests: [
     {
       id: "req-4401",
@@ -323,4 +335,5 @@ export const starlineData: StarlineData = {
   ],
   cart: [],
   wishlist: [],
+  notifications: [],
 };
