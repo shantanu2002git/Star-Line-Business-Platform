@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -45,19 +45,29 @@ const navCustomer = [
 const navAdmin = [
   { href: '/admin', label: 'Command center', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
-  { href: '/admin/categories', label: 'Categories', icon: Layers3 },
-  { href: '/admin/services', label: 'Services', icon: BriefcaseBusiness },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingBag },
   { href: '/admin/customers', label: 'Customers', icon: Users },
   { href: '/admin/requests', label: 'Requests', icon: FileText },
-  { href: '/admin/reviews', label: 'Reviews', icon: Star },
   { href: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { href: '/admin/billing', label: 'Billing', icon: WalletCards },
-  { href: '/admin/content', label: 'Content desk', icon: Megaphone },
+  { href: '/admin/settings', label: 'Settings', icon: Settings2 },
 ];
 
 function cx(...classes: Array<string | false | undefined>) { return classes.filter(Boolean).join(' '); }
 function money(value = 0) { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value); }
+function getProductDiscountPercent(product: any) {
+  const raw = Number(product?.discountPercentage ?? product?.discount ?? 0);
+  if (Number.isFinite(raw) && raw > 0) return raw;
+  const original = Number(product?.originalPrice ?? product?.compareAtPrice ?? product?.listPrice ?? 0);
+  const price = Number(product?.price ?? 0);
+  if (original > 0 && price > 0 && price < original) return Math.round(((original - price) / original) * 100);
+  return 0;
+}
+function getProductFinalPrice(product: any) {
+  const price = Number(product?.price ?? 0);
+  const discount = getProductDiscountPercent(product);
+  return price - (price * discount / 100);
+}
 function initials(name = 'Star Line') { return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase(); }
 
 function Status({ value }: { value?: string }) {
@@ -84,6 +94,42 @@ function ThemeToggle() {
   return <button data-testid="button-theme-toggle" onClick={() => setDark(!dark)} className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground">{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>;
 }
 
+type Announcement = {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  active: boolean;
+};
+
+const ANNOUNCEMENT_STORAGE_KEY = 'star-line-announcements';
+
+function readAnnouncements(): Announcement[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const value = window.localStorage.getItem(ANNOUNCEMENT_STORAGE_KEY);
+    return value ? JSON.parse(value) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeAnnouncements(items: Announcement[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(ANNOUNCEMENT_STORAGE_KEY, JSON.stringify(items));
+}
+
+function getActiveAnnouncements() {
+  const now = new Date();
+  return readAnnouncements().filter((announcement) => {
+    if (!announcement.active) return false;
+    if (announcement.startDate && new Date(announcement.startDate) > now) return false;
+    if (announcement.endDate && new Date(announcement.endDate) < now) return false;
+    return true;
+  });
+}
+
 function NotificationCenter({ limit = 6 }: { limit?: number }) {
   const demoNotifications = [
     { id: 'n-1', title: 'Print job approved', message: 'Your 42-page brochure request has been approved and is moving to production.', read: false },
@@ -93,13 +139,19 @@ function NotificationCenter({ limit = 6 }: { limit?: number }) {
     { id: 'n-5', title: 'Delivery update', message: 'Your cable order is packed and will be available for pickup tomorrow.', read: false },
     { id: 'n-6', title: 'Price confirmation', message: 'The revised quote for your print job is confirmed.', read: true },
   ];
-  const notifications = demoNotifications;
+  const announcements = getActiveAnnouncements().map((announcement) => ({
+    id: `a-${announcement.id}`,
+    title: announcement.title,
+    message: announcement.description,
+    read: false,
+  }));
+  const notifications = [...announcements, ...demoNotifications].slice(0, limit);
   const unread = notifications.filter((item) => !item.read).length;
-  return <section className="rounded-2xl border border-border bg-card p-4 sm:p-5"><div className="flex items-center justify-between"><div><h2 className="font-display text-lg font-bold">Notifications</h2><p className="mt-1 text-xs text-muted-foreground">{unread ? `${unread} unread update${unread === 1 ? '' : 's'}` : 'You are all caught up.'}</p></div><Bell className="h-5 w-5 text-muted-foreground" /></div>{notifications.length > 0 && <div className="mt-4 space-y-2">{notifications.slice(0, limit).map((item) => <div key={item.id} className={cx('block w-full rounded-xl p-3 text-left text-xs', !item.read ? 'bg-secondary' : 'bg-background')}><div className="font-bold">{item.title}</div><div className="mt-1 text-muted-foreground">{item.message}</div></div>)}</div>}</section>;
+  return <section className="rounded-2xl border border-border bg-card p-4 sm:p-5"><div className="flex items-center justify-between"><div><h2 className="font-display text-lg font-bold">Notifications</h2><p className="mt-1 text-xs text-muted-foreground">{unread ? `${unread} unread update${unread === 1 ? '' : 's'}` : 'You are all caught up.'}</p></div><Bell className="h-5 w-5 text-muted-foreground" /></div>{notifications.length > 0 && <div className="mt-4 space-y-2">{notifications.map((item) => <div key={item.id} className={cx('block w-full rounded-xl p-3 text-left text-xs', !item.read ? 'bg-secondary' : 'bg-background')}><div className="font-bold">{item.title}</div><div className="mt-1 text-muted-foreground">{item.message}</div></div>)}</div>}</section>;
 }
 
 function NotificationsPage() {
-  return <Shell mode="portal"><PageHeading eyebrow="Customer desk / notifications" title="Your updates" body="Order and request changes appear here as they happen." /><div className="space-y-3"><NotificationCenter limit={10} /></div></Shell>;
+  return <Shell mode="portal"><PageHeading eyebrow="Customer desk / notifications" title="Your updates" body="Order, request, and active announcement updates appear here as they happen." /><div className="space-y-3"><NotificationCenter limit={10} /></div></Shell>;
 }
 
 function OrderHistoryPage() {
@@ -110,12 +162,16 @@ function OrderHistoryPage() {
 }
 
 function AdminOrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const refresh = () => { setLoading(true); void listOrders().then(setOrders).finally(() => setLoading(false)); };
-  useEffect(() => { refresh(); }, []);
-  const updateOrder = async (id: string, status: string) => { await fetch(`/api/orders/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status }) }); refresh(); };
-  return <Shell mode="admin"><PageHeading eyebrow="Operations / fulfillment" title="Orders" body="Update status here and the customer order history and notifications follow automatically." />{loading ? <SkeletonRows count={4} /> : <div className="grid gap-3">{orders.map((order) => <article key={order.id} className="rounded-2xl border border-border bg-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-mono-ui text-xs font-bold">{order.number}</div><div className="mt-1 text-sm font-bold">{order.customer}</div><div className="mt-1 text-xs text-muted-foreground">{order.items.map((item) => `${item.name} × ${item.quantity}`).join(', ')}</div></div><strong>{money(order.total)}</strong></div><div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3"><span className="text-xs text-muted-foreground">Payment: {order.paymentMethod}</span><select value={order.status} onChange={(event) => void updateOrder(order.id, event.target.value)} className="min-h-10 rounded-xl border border-border bg-background px-3 text-xs font-bold"><option>Confirmed</option><option>Processing</option><option>Shipped</option><option>Delivered</option><option>Cancelled</option></select></div></article>)}</div>}</Shell>;
+  const ordersQuery = useListOrders({ pageSize: 100 });
+  const updateOrderMutation = useUpdateOrder();
+  const orders = ordersQuery.data?.items ?? [];
+
+  const updateOrder = async (id: string, status: string) => {
+    await updateOrderMutation.mutateAsync({ id, data: { status } });
+    await ordersQuery.refetch();
+  };
+
+  return <Shell mode="admin"><PageHeading eyebrow="Operations / fulfillment" title="Orders" body="Update status here and the customer order history and notifications follow automatically." />{ordersQuery.isLoading ? <SkeletonRows count={4} /> : <div className="grid gap-3">{orders.map((order) => <article key={order.id} className="rounded-2xl border border-border bg-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-mono-ui text-xs font-bold">{order.number}</div><div className="mt-1 text-sm font-bold">{order.customer}</div><div className="mt-1 text-xs text-muted-foreground">{order.items.map((item) => `${item.name} × ${item.quantity}`).join(', ')}</div></div><strong>{money(order.total)}</strong></div><div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3"><span className="text-xs text-muted-foreground">Payment: {order.paymentMethod}</span><select value={order.status} onChange={(event) => void updateOrder(order.id, event.target.value)} className="min-h-10 rounded-xl border border-border bg-background px-3 text-xs font-bold"><option>Confirmed</option><option>Processing</option><option>Shipped</option><option>Delivered</option><option>Cancelled</option></select></div></article>)}</div>}</Shell>;
 }
 
 function ProductDetailsCompact() {
@@ -127,11 +183,13 @@ function ProductDetailsCompact() {
   const product = (products.data?.items || []).find((item: any) => item.id === params?.id) as any;
   if (products.isLoading) return <Shell mode="portal"><SkeletonRows count={3} /></Shell>;
   if (!product) return <Shell mode="portal"><EmptyState title="Product not found" body="This item may have moved off the shelf." action={<StoreButton onClick={() => setLocation('/portal/catalog')}>Back to catalog</StoreButton>} /></Shell>;
-  const discount = product.originalPrice ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
+  const discount = getProductDiscountPercent(product);
+  const finalPrice = getProductFinalPrice(product);
   const relatedProducts = (products.data?.items || []).filter((item: any) => item.id !== product.id && item.category === product.category).slice(0, 4);
   const variantProducts = relatedProducts.length > 0 ? relatedProducts : (products.data?.items || []).filter((item: any) => item.category === product.category && item.id !== product.id).slice(0, 3);
+  const images = Array.isArray(product.images) ? product.images.filter(Boolean) : typeof product.image === 'string' && product.image.includes(',') ? product.image.split(',').map((image: string) => image.trim()).filter(Boolean) : product.image ? [product.image] : [];
   const share = async () => { try { if (navigator.share) await navigator.share({ title: product.name, text: product.description, url: window.location.href }); else { await navigator.clipboard.writeText(window.location.href); toast({ title: 'Product link copied' }); } } catch { /* cancelled share */ } };
-  return <Shell mode="portal"><button onClick={() => setLocation('/portal/catalog')} className="mb-4 text-sm font-bold text-muted-foreground">← Back to shop</button><div className="grid gap-5 lg:grid-cols-[.85fr_1.15fr]"><section><ProductImage product={product} large /><div className="mt-2 grid grid-cols-4 gap-2">{(product.images || [product.image]).map((image: string, index: number) => <div key={`${image}-${index}`} className="grid h-16 place-items-center rounded-xl border border-border bg-secondary text-[9px] font-bold uppercase text-muted-foreground">{image}</div>)}</div></section><section><div className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">{product.brand} · {product.category}</div><h1 className="mt-2 font-display text-3xl font-bold">{product.name}</h1><div className="mt-2 flex flex-wrap gap-3 text-sm"><span className="font-bold text-amber-600">★ {product.rating}</span><span className="text-muted-foreground">{product.reviews} reviews</span><span className="font-mono-ui text-xs text-muted-foreground">SKU {product.sku}</span></div><p className="mt-4 text-sm leading-6 text-muted-foreground">{product.description}</p><div className="mt-5 flex items-center gap-3"><span className="text-2xl font-bold">{money(product.price)}</span><span className="text-sm text-muted-foreground line-through">{money(product.originalPrice)}</span><span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">{discount}% off</span></div><p className="mt-2 text-sm font-semibold text-emerald-700">{product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}</p><div className="mt-5 flex flex-wrap gap-2"><StoreButton onClick={() => void addToCart(product.id)}><ShoppingBag className="h-4 w-4" /> Add to cart</StoreButton><StoreButton variant="outline" onClick={() => { void addToCart(product.id); setLocation('/portal/cart'); }}>Buy now</StoreButton><button onClick={() => void share()} className="min-h-11 rounded-xl border border-border px-4 text-sm font-bold">Share product</button></div></section></div>{variantProducts.length > 0 && <section className="mt-6"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-display text-lg font-bold">Related products</h2><p className="mt-1 text-xs text-muted-foreground">More from {product.category}.</p></div></div><div className="grid grid-cols-3 gap-2">{variantProducts.map((item: any, index: number) => <button key={item.id} onClick={() => setLocation(`/portal/products/${item.id}`)} className="rounded-xl border border-border bg-card p-3 text-center text-xs font-bold uppercase tracking-[.12em] text-muted-foreground transition hover:-translate-y-0.5 hover:border-primary hover:text-foreground"><div className="mb-2 flex justify-center"><ProductImage product={item} /></div>{item.name.includes('Cable') ? `Cable-${index + 1}` : item.name}</button>)}</div></section>}</Shell>;
+  return <Shell mode="portal"><button onClick={() => setLocation('/portal/catalog')} className="mb-4 text-sm font-bold text-muted-foreground">← Back to shop</button><div className="grid gap-5 lg:grid-cols-[.85fr_1.15fr]"><section><ProductImage product={product} large /><div className="mt-2 grid grid-cols-4 gap-2">{images.map((image: string, index: number) => <div key={`${image}-${index}`} className="grid h-16 place-items-center overflow-hidden rounded-xl border border-border bg-secondary"><img src={image} alt={`${product.name} view ${index + 1}`} className="h-full w-full object-cover" /></div>)}</div></section><section><div className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">{product.category}</div><h1 className="mt-2 font-display text-3xl font-bold">{product.name}</h1><div className="mt-2 flex flex-wrap gap-3 text-sm"><span className="font-bold text-amber-600">★ {product.rating ?? 4.5}</span><span className="text-muted-foreground">{product.reviews ?? 0} reviews</span></div><p className="mt-4 text-sm leading-6 text-muted-foreground">{product.description}</p><div className="mt-5 space-y-2"><div className="flex items-center gap-3"><span className="text-xl font-bold text-muted-foreground line-through">{money(Number(product.price) || 0)}</span><span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">{discount}% off</span></div><div className="text-2xl font-bold">{money(finalPrice)}</div></div><div className="mt-3 grid gap-2 text-sm text-muted-foreground"><div><span className="font-semibold text-foreground">Price:</span> {money(Number(product.price) || 0)}</div><div><span className="font-semibold text-foreground">Final price:</span> {money(finalPrice)}</div><div><span className="font-semibold text-foreground">Available stock:</span> {product.stock > 0 ? `${product.stock} units` : 'Out of stock'}</div></div><p className="mt-2 text-sm font-semibold text-emerald-700">{product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}</p><div className="mt-5 flex flex-wrap gap-2"><StoreButton onClick={() => void addToCart(product.id)}><ShoppingBag className="h-4 w-4" /> Add to cart</StoreButton><StoreButton variant="outline" onClick={() => { void addToCart(product.id); setLocation('/portal/cart'); }}>Buy now</StoreButton><button onClick={() => void share()} className="min-h-11 rounded-xl border border-border px-4 text-sm font-bold">Share product</button></div></section></div>{variantProducts.length > 0 && <section className="mt-6"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-display text-lg font-bold">Related products</h2><p className="mt-1 text-xs text-muted-foreground">More from {product.category}.</p></div></div><div className="grid grid-cols-3 gap-2">{variantProducts.map((item: any, index: number) => <button key={item.id} onClick={() => setLocation(`/portal/products/${item.id}`)} className="rounded-xl border border-border bg-card p-3 text-center text-xs font-bold uppercase tracking-[.12em] text-muted-foreground transition hover:-translate-y-0.5 hover:border-primary hover:text-foreground"><div className="mb-2 flex justify-center"><ProductImage product={item} /></div>{item.name.includes('Cable') ? `Cable-${index + 1}` : item.name}</button>)}</div></section>}</Shell>;
 }
 
 function CustomerOverview() {
@@ -152,7 +210,7 @@ function Shell({ mode, children }: { mode: 'portal' | 'admin'; children: ReactNo
   const [open, setOpen] = useState(false);
   const nav = mode === 'admin' ? navAdmin : navCustomer;
   const active = (href: string) => location === href || (href !== '/admin' && href !== '/portal' && location.startsWith(href));
-  return <div className="noise min-h-[100dvh] bg-background text-foreground"><aside className={cx('fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-sidebar-border bg-sidebar p-5 text-sidebar-foreground transition-transform lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}><div className="mb-8 flex items-center justify-between"><Logo /><button data-testid="button-close-menu" onClick={() => setOpen(false)} className="text-sidebar-foreground/60 lg:hidden"><X className="h-5 w-5" /></button></div><div className="mb-3 px-3 font-mono-ui text-[10px] uppercase tracking-[.2em] text-sidebar-foreground/45">{mode === 'admin' ? 'Operations' : 'Customer desk'}</div><nav className="space-y-1">{nav.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`} onClick={() => setOpen(false)} className={cx('group flex min-h-11 items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground', active(item.href) && 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground')}><span className="flex items-center gap-3"><Icon className="h-[17px] w-[17px]" />{item.label}</span>{active(item.href) && <ChevronRight className="h-4 w-4" />}</Link>; })}</nav><div className="mt-auto rounded-2xl border border-sidebar-border bg-sidebar-accent p-4"><button type="button" onClick={() => setLocation(mode === 'admin' ? '/admin/requests' : '/portal/notifications')} className="relative mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-accent-foreground transition hover:opacity-90"><Bell className="h-4 w-4" /><span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">3</span></button><div className="text-sm font-bold">{mode === 'admin' ? 'Keep the line moving.' : 'Need a hand?'}</div><p className="mt-1 text-xs leading-5 text-sidebar-foreground/55">{mode === 'admin' ? 'Three requests need a document check today.' : 'Our counter team is one message away.'}</p><button data-testid="button-sidebar-action" onClick={() => setLocation(mode === 'admin' ? '/admin/requests' : '/portal/requests/new')} className="mt-4 text-xs font-bold text-accent hover:underline">{mode === 'admin' ? 'Review queue →' : 'Start a request →'}</button></div></aside><div className="lg:pl-[260px]"><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur sm:px-5 lg:h-[72px] lg:px-9"><div className="flex items-center gap-2"><button data-testid="button-open-menu" onClick={() => setOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-card lg:hidden"><Menu className="h-4 w-4" /></button><div className="hidden text-sm font-semibold text-muted-foreground sm:block">{mode === 'admin' ? 'Star Line / Operations' : 'Star Line / Customer desk'}</div><div className="flex items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs text-muted-foreground sm:hidden"><Logo compact /></div></div><div className="flex items-center gap-1.5"><div className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground md:flex"><span className="h-2 w-2 animate-pulse-soft rounded-full bg-emerald-500" /> System online</div><button data-testid="button-notifications" onClick={() => setLocation(mode === 'admin' ? '/admin/requests' : '/portal/notifications')} className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-card text-muted-foreground"><Bell className="h-4 w-4" /></button><ThemeToggle /><button data-testid="button-account" className="hidden items-center gap-2 rounded-xl border border-border bg-card py-1.5 pl-1.5 pr-3 text-left sm:flex"><span className="grid h-6 w-6 place-items-center rounded-lg bg-primary text-[10px] font-bold text-primary-foreground">{mode === 'admin' ? 'AK' : 'AS'}</span><span className="text-xs font-bold">{mode === 'admin' ? 'Akhil / staff' : 'Ananya Shah'}</span></button></div></header><main className="mx-auto max-w-[1600px] px-4 pb-24 pt-5 sm:px-5 lg:p-9">{children}</main>{mode === 'portal' && <nav className="fixed inset-x-3 bottom-3 z-30 grid grid-cols-4 rounded-2xl border border-border bg-card/95 p-1.5 shadow-xl backdrop-blur lg:hidden">{nav.filter((item) => ['/portal', '/portal/catalog', '/portal/cart', '/portal/requests'].includes(item.href)).map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className={cx('flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-bold text-muted-foreground', active(item.href) && 'bg-primary text-primary-foreground')}><Icon className="h-4 w-4" /><span>{item.label === 'Shopping cart' ? 'Cart' : item.label === 'My requests' ? 'Requests' : item.label === 'Shop catalog' ? 'Shop' : 'Home'}</span></Link>; })}</nav>}</div></div>;
+  return <div className="noise min-h-[100dvh] bg-background text-foreground"><aside className={cx('fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-sidebar-border bg-sidebar p-5 text-sidebar-foreground transition-transform lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}><div className="mb-8 flex items-center justify-between"><Logo /><button data-testid="button-close-menu" onClick={() => setOpen(false)} className="text-sidebar-foreground/60 lg:hidden"><X className="h-5 w-5" /></button></div><div className="mb-3 px-3 font-mono-ui text-[10px] uppercase tracking-[.2em] text-sidebar-foreground/45">{mode === 'admin' ? 'Operations' : 'Customer desk'}</div><nav className="space-y-1">{nav.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`} onClick={() => setOpen(false)} className={cx('group flex min-h-11 items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground', active(item.href) && 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground')}><span className="flex items-center gap-3"><Icon className="h-[17px] w-[17px]" />{item.label}</span>{active(item.href) && <ChevronRight className="h-4 w-4" />}</Link>; })}</nav></aside><div className="lg:pl-[260px]"><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur sm:px-5 lg:h-[72px] lg:px-9"><div className="flex items-center gap-2"><button data-testid="button-open-menu" onClick={() => setOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-card lg:hidden"><Menu className="h-4 w-4" /></button><div className="hidden text-sm font-semibold text-muted-foreground sm:block">{mode === 'admin' ? 'Star Line / Operations' : 'Star Line / Customer desk'}</div><div className="flex items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs text-muted-foreground sm:hidden"><Logo compact /></div></div><div className="flex items-center gap-1.5"><div className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground md:flex"><span className="h-2 w-2 animate-pulse-soft rounded-full bg-emerald-500" /> System online</div><button data-testid="button-notifications" onClick={() => setLocation(mode === 'admin' ? '/admin/requests' : '/portal/notifications')} className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-card text-muted-foreground"><Bell className="h-4 w-4" /></button><ThemeToggle /><button data-testid="button-account" className="hidden items-center gap-2 rounded-xl border border-border bg-card py-1.5 pl-1.5 pr-3 text-left sm:flex"><span className="grid h-6 w-6 place-items-center rounded-lg bg-primary text-[10px] font-bold text-primary-foreground">{mode === 'admin' ? 'AK' : 'AS'}</span><span className="text-xs font-bold">{mode === 'admin' ? 'Akhil / staff' : 'Ananya Shah'}</span></button></div></header><main className="mx-auto max-w-[1600px] px-4 pb-24 pt-5 sm:px-5 lg:p-9">{children}</main>{mode === 'portal' && <nav className="fixed inset-x-3 bottom-3 z-30 grid grid-cols-4 rounded-2xl border border-border bg-card/95 p-1.5 shadow-xl backdrop-blur lg:hidden">{nav.filter((item) => ['/portal', '/portal/catalog', '/portal/cart', '/portal/requests'].includes(item.href)).map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className={cx('flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-bold text-muted-foreground', active(item.href) && 'bg-primary text-primary-foreground')}><Icon className="h-4 w-4" /><span>{item.label === 'Shopping cart' ? 'Cart' : item.label === 'My requests' ? 'Requests' : item.label === 'Shop catalog' ? 'Shop' : 'Home'}</span></Link>; })}</nav>}</div></div>;
 }
 
 function PageHeading({ eyebrow, title, body, action }: { eyebrow: string; title: string; body?: string; action?: ReactNode }) {
@@ -212,7 +270,7 @@ function PortalListPage({ kind }: { kind: 'requests' | 'invoices' | 'reviews' })
   const reviews = useListReviews();
   const [, setLocation] = useLocation();
   const config = { requests: { title: 'My requests', eyebrow: 'Customer desk / requests', body: 'Everything you have put on the line, with the next action clear.' }, invoices: { title: 'Invoices', eyebrow: 'Customer desk / billing', body: 'A simple record of work completed and payments made.' }, reviews: { title: 'Your reviews', eyebrow: 'Customer desk / reviews', body: 'A few words help our neighborhood counter keep getting better.' } }[kind];
-  return <Shell mode="portal"><PageHeading eyebrow={config.eyebrow} title={config.title} body={config.body} action={kind === 'requests' ? <ActionButton onClick={() => setLocation('/portal/requests/new')}><Plus className="h-4 w-4" /> New request</ActionButton> : kind === 'reviews' ? <ActionButton><Plus className="h-4 w-4" /> Leave a review</ActionButton> : undefined} />{kind === 'requests' && <div className="space-y-3">{requests.isLoading ? <SkeletonRows /> : requests.data?.items?.length ? requests.data.items.map((request) => <div key={request.id} data-testid={`row-portal-request-${request.id}`} className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-4"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary"><FileText className="h-5 w-5" /></div><div><div className="font-bold">{request.service}</div><div className="mt-1 flex flex-wrap gap-3 font-mono-ui text-[11px] text-muted-foreground"><span>{request.reference}</span><span>Submitted {request.submittedAt}</span><span>{request.documents?.length || 0} documents</span></div></div></div><div className="flex items-center justify-between gap-5 sm:justify-end"><div className="text-right"><div className="font-bold">{money(request.amount)}</div><div className="mt-1 text-xs text-muted-foreground">Due {request.dueDate || 'to confirm'}</div></div><Status value={request.status} /></div></div>) : <EmptyState title="Your line is clear" body="Submit a service request when you are ready." action={<ActionButton onClick={() => setLocation('/portal/requests/new')}><Plus className="h-4 w-4" /> Start a request</ActionButton>} />}</div>}{kind === 'invoices' && <div className="overflow-hidden rounded-2xl border border-border bg-card">{invoices.isLoading ? <div className="p-5"><SkeletonRows /></div> : invoices.data?.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="px-5 py-4">Invoice</th><th className="px-5 py-4">Issued</th><th className="px-5 py-4">Amount</th><th className="px-5 py-4">Status</th><th className="px-5 py-4" /></tr></thead><tbody>{invoices.data.map((invoice) => <tr key={invoice.id} data-testid={`row-invoice-${invoice.id}`} className="border-b border-border last:border-0"><td className="px-5 py-4 font-bold">{invoice.number}</td><td className="px-5 py-4 text-muted-foreground">{invoice.issuedAt}</td><td className="px-5 py-4 font-bold">{money(invoice.amount)}</td><td className="px-5 py-4"><Status value={invoice.status} /></td><td className="px-5 py-4 text-right"><button data-testid={`button-download-invoice-${invoice.id}`} className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline"><Download className="h-3.5 w-3.5" /> PDF</button></td></tr>)}</tbody></table></div> : <EmptyState title="No invoices yet" body="Completed work and receipts will be listed here." />}</div>}{kind === 'reviews' && <div className="grid gap-4 md:grid-cols-2">{reviews.isLoading ? <SkeletonRows count={4} /> : reviews.data?.length ? reviews.data.map((review) => <div key={review.id} data-testid={`card-review-${review.id}`} className="rounded-2xl border border-border bg-card p-5"><div className="flex items-start justify-between"><div><div className="font-bold">{review.product}</div><div className="mt-1 text-xs text-muted-foreground">{review.date}</div></div><Status value={review.visibility} /></div><div className="mt-4 flex gap-1">{Array.from({ length: 5 }).map((_, index) => <Star key={index} className={cx('h-4 w-4', index < review.rating ? 'fill-accent text-accent-foreground' : 'text-muted-foreground')} />)}</div><p className="mt-4 text-sm leading-6 text-muted-foreground">“{review.comment}”</p></div>) : <EmptyState title="No reviews yet" body="Tell the neighborhood what you thought of your Star Line experience." />}</div>}</Shell>;
+  return <Shell mode="portal"><PageHeading eyebrow={config.eyebrow} title={config.title} body={config.body} action={kind === 'reviews' ? <ActionButton><Plus className="h-4 w-4" /> Leave a review</ActionButton> : undefined} />{kind === 'requests' && <div className="space-y-3">{requests.isLoading ? <SkeletonRows /> : requests.data?.items?.length ? requests.data.items.map((request) => <div key={request.id} data-testid={`row-portal-request-${request.id}`} className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-4"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary"><FileText className="h-5 w-5" /></div><div><div className="font-bold">{request.service}</div><div className="mt-1 flex flex-wrap gap-3 font-mono-ui text-[11px] text-muted-foreground"><span>{request.reference}</span><span>Submitted {request.submittedAt}</span><span>{request.documents?.length || 0} documents</span></div></div></div><div className="flex items-center justify-between gap-5 sm:justify-end"><div className="text-right"><div className="font-bold">{money(request.amount)}</div><div className="mt-1 text-xs text-muted-foreground">Due {request.dueDate || 'to confirm'}</div></div><Status value={request.status} /></div></div>) : <EmptyState title="Your line is clear" body="Submit a service request when you are ready." action={<ActionButton onClick={() => setLocation('/portal/requests/new')}><Plus className="h-4 w-4" /> Start a request</ActionButton>} />}</div>}{kind === 'invoices' && <div className="overflow-hidden rounded-2xl border border-border bg-card">{invoices.isLoading ? <div className="p-5"><SkeletonRows /></div> : invoices.data?.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="px-5 py-4">Invoice</th><th className="px-5 py-4">Issued</th><th className="px-5 py-4">Amount</th><th className="px-5 py-4">Status</th><th className="px-5 py-4" /></tr></thead><tbody>{invoices.data.map((invoice) => <tr key={invoice.id} data-testid={`row-invoice-${invoice.id}`} className="border-b border-border last:border-0"><td className="px-5 py-4 font-bold">{invoice.number}</td><td className="px-5 py-4 text-muted-foreground">{invoice.issuedAt}</td><td className="px-5 py-4 font-bold">{money(invoice.amount)}</td><td className="px-5 py-4"><Status value={invoice.status} /></td><td className="px-5 py-4 text-right"><button data-testid={`button-download-invoice-${invoice.id}`} className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline"><Download className="h-3.5 w-3.5" /> PDF</button></td></tr>)}</tbody></table></div> : <EmptyState title="No invoices yet" body="Completed work and receipts will be listed here." />}</div>}{kind === 'reviews' && <div className="grid gap-4 md:grid-cols-2">{reviews.isLoading ? <SkeletonRows count={4} /> : reviews.data?.length ? reviews.data.map((review) => <div key={review.id} data-testid={`card-review-${review.id}`} className="rounded-2xl border border-border bg-card p-5"><div className="flex items-start justify-between"><div><div className="font-bold">{review.product}</div><div className="mt-1 text-xs text-muted-foreground">{review.date}</div></div><Status value={review.visibility} /></div><div className="mt-4 flex gap-1">{Array.from({ length: 5 }).map((_, index) => <Star key={index} className={cx('h-4 w-4', index < review.rating ? 'fill-accent text-accent-foreground' : 'text-muted-foreground')} />)}</div><p className="mt-4 text-sm leading-6 text-muted-foreground">“{review.comment}”</p></div>) : <EmptyState title="No reviews yet" body="Tell the neighborhood what you thought of your Star Line experience." />}</div>}</Shell>;
 }
 
 function MetricCard({ label, value, detail, icon: Icon, accent = false }: { label: string; value: string; detail: string; icon: IconType; accent?: boolean }) {
@@ -232,19 +290,181 @@ function AdminDashboard() {
   return <Shell mode="admin"><PageHeading eyebrow="Operations / command center" title="Good morning, Akhil." body="A quick read on the counter: what is moving, what needs attention, and where the line is growing." action={<div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs"><span className="h-2 w-2 rounded-full bg-emerald-500" />{health.data?.status || 'Checking system'}</div>} /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{summary.isLoading ? <SkeletonRows count={4} /> : <><MetricCard label="Revenue this month" value={money(metrics?.revenue)} detail="+8.4% from last month" icon={TrendingUp} accent /><MetricCard label="Orders" value={String(metrics?.orders ?? '—')} detail="Across every counter" icon={ShoppingBag} /><MetricCard label="Open requests" value={String(metrics?.pendingRequests ?? '—')} detail="3 need a decision today" icon={Clock3} /><MetricCard label="Low stock" value={String(metrics?.lowStock ?? '—')} detail="Items below reorder point" icon={CircleAlert} /></>}</div><div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_.85fr]"><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-6 flex items-start justify-between"><div><h2 className="font-display text-xl font-bold">Revenue rhythm</h2><p className="mt-1 text-sm text-muted-foreground">A steady view of the last six months.</p></div><Activity className="h-5 w-5 text-muted-foreground" /></div><MiniChart points={data?.revenueTrend} color="hsl(var(--chart-2))" /></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-6 flex items-start justify-between"><div><h2 className="font-display text-xl font-bold">Service requests</h2><p className="mt-1 text-sm text-muted-foreground">The queue by month.</p></div><FileText className="h-5 w-5 text-muted-foreground" /></div><MiniChart points={data?.serviceRequests} color="hsl(var(--chart-3))" /></section></div><div className="mt-6 grid gap-6 xl:grid-cols-[1fr_380px]"><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-display text-xl font-bold">Recent activity</h2><p className="mt-1 text-sm text-muted-foreground">The pulse at the counter.</p></div><button data-testid="button-refresh-dashboard" onClick={() => summary.refetch()} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary"><RotateCcw className={cx('h-4 w-4', summary.isFetching && 'animate-spin')} /></button></div>{data?.recentActivity?.length ? <div className="space-y-4">{data.recentActivity.map((activity) => <div key={activity.id} data-testid={`activity-${activity.id}`} className="flex gap-3"><span className={cx('mt-1 h-2.5 w-2.5 rounded-full', activity.tone === 'warning' ? 'bg-amber-500' : activity.tone === 'success' ? 'bg-emerald-500' : 'bg-accent')} /><div className="flex-1"><div className="text-sm font-semibold">{activity.title}</div><div className="mt-1 text-xs text-muted-foreground">{activity.detail}</div></div><span className="font-mono-ui text-[10px] text-muted-foreground">{activity.time}</span></div>)}</div> : <EmptyState title="No activity yet" body="The command center will show movement here." />}</section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-display text-xl font-bold">Top products</h2><p className="mt-1 text-sm text-muted-foreground">By recent movement.</p></div><Package className="h-5 w-5 text-muted-foreground" /></div><div className="space-y-4">{(data?.topProducts || []).map((item, index) => <div key={item.label} className="flex items-center gap-3"><span className="font-mono-ui text-xs text-muted-foreground">0{index + 1}</span><div className="flex-1"><div className="flex justify-between text-sm font-semibold"><span>{item.label}</span><span>{item.value}</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.value / Math.max(...(data?.topProducts || [{ value: 1 }]).map((point) => point.value))) * 100)}%` }} /></div></div></div>)}</div></section></div></Shell>;
 }
 
-type AdminResource = 'products' | 'categories' | 'services' | 'orders' | 'customers' | 'requests' | 'reviews' | 'inventory' | 'billing' | 'content';
+type AdminResource = 'products' | 'categories' | 'services' | 'orders' | 'customers' | 'requests' | 'reviews' | 'inventory' | 'billing' | 'content' | 'offers';
 const resourceMeta: Record<AdminResource, { title: string; eyebrow: string; description: string; icon: IconType }> = {
   products: { title: 'Products', eyebrow: 'Operations / catalog', description: 'Keep the shelf accurate, useful, and ready for the next customer.', icon: Package },
   categories: { title: 'Categories', eyebrow: 'Operations / catalog', description: 'A clear structure makes the right item easy to find.', icon: Layers3 },
-  services: { title: 'Services', eyebrow: 'Operations / service desk', description: 'Shape the desks customers can request from the portal.', icon: BriefcaseBusiness },
+  services: { title: 'Services', eyebrow: 'Operations / services', description: 'Service desk offers that customers can request online.', icon: BriefcaseBusiness },
   orders: { title: 'Orders', eyebrow: 'Operations / fulfillment', description: 'Every pickup, payment, and counter handoff in one place.', icon: ShoppingBag },
   customers: { title: 'Customers', eyebrow: 'Operations / relationships', description: 'Know the people behind the requests and keep the line personal.', icon: Users },
   requests: { title: 'Service requests', eyebrow: 'Operations / queue', description: 'Review uploads, set expectations, and keep work moving.', icon: FileText },
-  reviews: { title: 'Reviews', eyebrow: 'Operations / reputation', description: 'Moderate what customers share with the neighborhood.', icon: Star },
+  reviews: { title: 'Reviews', eyebrow: 'Operations / feedback', description: 'Customer feedback to improve service quality.', icon: Star },
   inventory: { title: 'Inventory', eyebrow: 'Operations / stockroom', description: 'Spot what is low before it becomes a customer problem.', icon: Boxes },
   billing: { title: 'Billing', eyebrow: 'Operations / finance', description: 'Invoices that are easy to trace and even easier to send.', icon: WalletCards },
-  content: { title: 'Content desk', eyebrow: 'Operations / website', description: 'Keep offers, banners, and useful pages current.', icon: Megaphone },
+  content: { title: 'Content pages', eyebrow: 'Operations / content', description: 'Manage the storefront and information pages.', icon: Megaphone },
+  offers: { title: 'Offers', eyebrow: 'Operations / promo', description: 'Promotions and discount campaigns that need attention.', icon: TicketPercent },
 };
+
+function getCategoryList() {
+  if (typeof window === 'undefined') return [] as Array<{ id: string; name: string; active?: boolean; slug?: string }>;
+  try {
+    const raw = localStorage.getItem('star-line-categories');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setCategoryList(items: Array<{ id: string; name: string; active?: boolean; slug?: string }>) {
+  if (typeof window !== 'undefined') localStorage.setItem('star-line-categories', JSON.stringify(items));
+}
+
+function normalizeCategoryName(name: string) {
+  return name.trim().replace(/\s+/g, ' ');
+}
+
+function SettingsPage() {
+  const categories = useListCategories();
+  const deleteCategoryMutation = useDeleteCategory();
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryStatus, setCategoryStatus] = useState<'active' | 'inactive'>('active');
+  const [announcement, setAnnouncement] = useState({ title: '', description: '', startDate: '', endDate: '', active: true });
+  const [localCategories, setLocalCategories] = useState<Array<{ id: string; name: string; active?: boolean; slug?: string }>>(getCategoryList());
+  const [announcements, setAnnouncements] = useState<Announcement[]>(readAnnouncements());
+
+  useEffect(() => { setLocalCategories(getCategoryList()); }, [categories.data]);
+  const mergedCategories = (categories.data || []).map((item: any) => ({ id: item.id, name: item.name, active: item.active ?? true, slug: item.slug ?? item.name.toLowerCase().replace(/\s+/g, '-') }));
+  const allCategories = [...mergedCategories, ...localCategories.filter((item) => !mergedCategories.some((existing) => existing.id === item.id && existing.name === item.name))];
+
+  const saveCategories = (items: Array<{ id: string; name: string; active?: boolean; slug?: string }>) => {
+    setLocalCategories(items);
+    setCategoryList(items);
+  };
+
+  const addCategory = () => {
+    const name = normalizeCategoryName(categoryName);
+    if (!name) return;
+    const next = [...allCategories, { id: `cat-${Date.now()}`, name, active: categoryStatus === 'active', slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') }];
+    saveCategories(next);
+    setCategoryName('');
+    setCategoryStatus('active');
+  };
+
+  const toggleCategory = (id: string) => {
+    const next = allCategories.map((item) => item.id === id ? { ...item, active: !(item.active ?? true) } : item);
+    saveCategories(next);
+  };
+
+  const removeCategory = (id: string) => {
+    const target = allCategories.find((item) => item.id === id);
+    const next = allCategories.filter((item) => item.id !== id);
+    saveCategories(next);
+
+    if (target && (categories.data || []).some((item: any) => item.id === id)) {
+      deleteCategoryMutation.mutate({ id }, {
+        onError: () => saveCategories(allCategories),
+      });
+    }
+  };
+
+  const saveAnnouncement = () => {
+    if (!announcement.title.trim()) return;
+    const items = [...announcements, { id: `announcement-${Date.now()}`, ...announcement, title: announcement.title.trim(), description: announcement.description.trim() }];
+    setAnnouncements(items);
+    writeAnnouncements(items);
+    setAnnouncement({ title: '', description: '', startDate: '', endDate: '', active: true });
+  };
+
+  const toggleAnnouncement = (id: string) => {
+    const next = announcements.map((item) => item.id === id ? { ...item, active: !item.active } : item);
+    setAnnouncements(next);
+    writeAnnouncements(next);
+  };
+
+  return <Shell mode="admin"><PageHeading eyebrow="Operations / settings" title="Settings" body="Manage categories and announcements for the store and staff desk." /><div className="grid gap-6 xl:grid-cols-2"><section className="rounded-2xl border border-border bg-card p-5"><div className="mb-4 flex items-center justify-between"><h2 className="font-display text-xl font-bold">Categories</h2><div className="rounded-full border border-border bg-secondary px-2 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Settings → Categories</div></div><div className="grid gap-3 sm:grid-cols-[1fr_120px_auto]"><input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="Add category" className="h-11 rounded-xl border border-border bg-background px-3 text-sm" /><select value={categoryStatus} onChange={(event) => setCategoryStatus(event.target.value as 'active' | 'inactive')} className="h-11 rounded-xl border border-border bg-background px-3 text-sm"><option value="active">Active</option><option value="inactive">Inactive</option></select><ActionButton onClick={addCategory} testId="button-add-category-settings"><Plus className="h-4 w-4" /> Add</ActionButton></div><div className="mt-5 space-y-2">{allCategories.length ? allCategories.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border border-border bg-background p-3"><div><div className="font-bold">{item.name}</div><div className="mt-1 text-xs text-muted-foreground">{item.slug || 'category'}</div></div><div className="flex items-center gap-2"><button onClick={() => toggleCategory(item.id)} className={cx('rounded-full px-2 py-1 text-[10px] font-bold uppercase', item.active === false ? 'bg-muted text-muted-foreground' : 'bg-emerald-100 text-emerald-700')}>{item.active === false ? 'Disabled' : 'Enabled'}</button><button onClick={() => removeCategory(item.id)} className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700">Delete</button></div></div>) : <EmptyState title="No categories yet" body="Create a category to populate the product form and catalog filters." />}</div></section><section className="rounded-2xl border border-border bg-card p-5"><div className="mb-4 flex items-center justify-between"><h2 className="font-display text-xl font-bold">Announcements</h2><div className="rounded-full border border-border bg-secondary px-2 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Broadcasts</div></div><div className="space-y-3"><input value={announcement.title} onChange={(event) => setAnnouncement((current) => ({ ...current, title: event.target.value }))} placeholder="Announcement title" className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" /><textarea value={announcement.description} onChange={(event) => setAnnouncement((current) => ({ ...current, description: event.target.value }))} placeholder="Description" className="min-h-24 w-full rounded-xl border border-border bg-background p-3 text-sm" /><div className="grid gap-3 sm:grid-cols-2"><input type="date" value={announcement.startDate} onChange={(event) => setAnnouncement((current) => ({ ...current, startDate: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm" /><input type="date" value={announcement.endDate} onChange={(event) => setAnnouncement((current) => ({ ...current, endDate: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm" /></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={announcement.active} onChange={(event) => setAnnouncement((current) => ({ ...current, active: event.target.checked }))} /> Active</label><ActionButton onClick={saveAnnouncement} testId="button-add-announcement"><Send className="h-4 w-4" /> Save announcement</ActionButton></div><div className="mt-5 space-y-2">{announcements.length ? announcements.map((item) => <div key={item.id} className="rounded-xl border border-border bg-background p-3"><div className="flex items-center justify-between gap-3"><div className="font-bold">{item.title}</div><button onClick={() => toggleAnnouncement(item.id)} className={cx('rounded-full px-2 py-1 text-[10px] font-bold uppercase', item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>{item.active ? 'Active' : 'Inactive'}</button></div><div className="mt-2 text-xs text-muted-foreground">{item.description}</div><div className="mt-2 flex flex-wrap gap-3 text-[10px] uppercase tracking-[.12em] text-muted-foreground"><span>{item.startDate || 'No start'}</span><span>→</span><span>{item.endDate || 'No end'}</span></div></div>) : <EmptyState title="No announcements" body="Add a bulletin to notify users when a new product or update is coming." />}</div></section></div></Shell>;
+}
+
+function ProductImageInput({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const [mode, setMode] = useState<'upload' | 'url'>('url');
+  const [selectedFile, setSelectedFile] = useState<string>('');
+
+  useEffect(() => {
+    if (!value) {
+      setMode('url');
+      setSelectedFile('');
+    }
+  }, [value]);
+
+  const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const fileUrl = URL.createObjectURL(file);
+    setSelectedFile(fileUrl);
+    onChange(fileUrl);
+    setMode('upload');
+  };
+
+  const currentValue = mode === 'upload' ? (selectedFile || value) : value;
+
+  return <div className="space-y-3"><div className="flex gap-2">
+    <button type="button" onClick={() => setMode('upload')} className={cx('rounded-xl border px-3 py-2 text-xs font-bold', mode === 'upload' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground')}>Upload Image</button>
+    <button type="button" onClick={() => setMode('url')} className={cx('rounded-xl border px-3 py-2 text-xs font-bold', mode === 'url' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground')}>Image URL</button>
+  </div>{mode === 'upload' ? <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/40 p-5 text-center"><Upload className="mb-2 h-5 w-5 text-muted-foreground" /><span className="text-sm font-bold">Choose product image</span><input type="file" accept="image/*" onChange={handleFile} className="hidden" /></label> : <input value={currentValue} onChange={(event) => onChange(event.target.value)} placeholder="https://example.com/product-image.jpg" className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" />} {value && <div className="overflow-hidden rounded-xl border border-border bg-secondary p-2"><img src={value} alt="Product preview" className="h-24 w-full rounded-lg object-cover" /></div>}</div>;
+}
+
+function ProductFormModal({ resource, open, onClose }: { resource: AdminResource; open: boolean; onClose: () => void }) {
+  const categoryOptions = getCategoryList();
+  const categories = useListCategories();
+  const createProduct = useCreateProduct();
+  const merged = [...(categories.data || []), ...categoryOptions.filter((item) => !(categories.data || []).some((existing: any) => existing.id === item.id || existing.name === item.name))];
+  const [product, setProduct] = useState({
+    category: merged[0]?.name || 'General',
+    name: '',
+    price: '',
+    stock: '',
+    discount: '',
+    description: '',
+    image: '',
+  });
+
+  useEffect(() => {
+    if (merged.length && !product.category) {
+      setProduct((current) => ({ ...current, category: merged[0].name }));
+    }
+  }, [merged, product.category]);
+
+  if (!open || resource !== 'products') return null;
+
+  const submit = () => {
+    const cleanName = product.name.trim();
+    const cleanDescription = product.description.trim();
+    const cleanPrice = Number(product.price) || 0;
+    const cleanStock = Number(product.stock) || 0;
+    const cleanDiscount = Number(product.discount) || 0;
+    const image = product.image.trim();
+    if (!cleanName || !cleanDescription || !cleanPrice || !cleanStock || !image) return;
+    const data = {
+      name: cleanName,
+      category: product.category,
+      price: cleanPrice,
+      stock: cleanStock,
+      image,
+      images: image ? [image] : [],
+      description: cleanDescription,
+      featured: false,
+      discountPercentage: cleanDiscount,
+      finalPrice: cleanPrice - (cleanPrice * cleanDiscount / 100),
+    };
+    createProduct.mutate({ data }, {
+      onSuccess: () => {
+        setProduct({ category: merged[0]?.name || 'General', name: '', price: '', stock: '', discount: '', description: '', image: '' });
+        onClose();
+      },
+    });
+  };
+
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"><div className="w-full max-w-2xl rounded-2xl border border-border bg-background p-5"><div className="flex items-center justify-between"><div><h2 className="font-display text-2xl font-bold">Add product</h2><p className="mt-1 text-xs text-muted-foreground">Create a product record from the admin-managed catalog.</p></div><button onClick={onClose} className="rounded-xl border border-border p-2"><X className="h-4 w-4" /></button></div><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm font-bold sm:col-span-2">Category<select value={product.category} onChange={(event) => setProduct((current) => ({ ...current, category: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm"><option value="">Choose category</option>{merged.filter((item: any) => item && item.name).map((item: any) => <option key={item.id || item.name} value={item.name}>{item.name}</option>)}</select></label><label className="grid gap-2 text-sm font-bold">Product Name<input value={product.name} onChange={(event) => setProduct((current) => ({ ...current, name: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm" /></label><label className="grid gap-2 text-sm font-bold">Product Price<input type="number" min="0" value={product.price} onChange={(event) => setProduct((current) => ({ ...current, price: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm" /></label><label className="grid gap-2 text-sm font-bold">Stock Quantity<input type="number" min="0" value={product.stock} onChange={(event) => setProduct((current) => ({ ...current, stock: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm" /></label><label className="grid gap-2 text-sm font-bold">Discount %<input type="number" min="0" max="100" value={product.discount} onChange={(event) => setProduct((current) => ({ ...current, discount: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm" /></label><label className="grid gap-2 text-sm font-bold sm:col-span-2">Product Description<textarea value={product.description} onChange={(event) => setProduct((current) => ({ ...current, description: event.target.value }))} className="min-h-28 rounded-xl border border-border bg-background p-3 text-sm" /></label><div className="sm:col-span-2"><ProductImageInput value={product.image} onChange={(next) => setProduct((current) => ({ ...current, image: next }))} /></div></div><div className="mt-6 flex justify-end gap-3"><button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-bold">Cancel</button><button onClick={submit} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Create product</button></div></div></div>;
+}
 
 function AdminDataProbe() {
   const qProducts = useListProducts({ pageSize: 100 }); const qCategories = useListCategories(); const qServices = useListServices(); const qCustomers = useListCustomers({ pageSize: 100 }); const qOrders = useListOrders({ pageSize: 100 }); const qRequests = useListServiceRequests({ pageSize: 100 }); const qReviews = useListReviews(); const qInventory = useListInventory(); const qInvoices = useListInvoices(); const qBanners = useListBanners(); const qOffers = useListOffers(); const qContent = useListContentPages();
@@ -276,6 +496,7 @@ function AdminResourcePage({ resource }: { resource: AdminResource }) {
   const [filter, setFilter] = useState('all');
   const [modal, setModal] = useState(false);
   const [name, setName] = useState('');
+  const [productDraft, setProductDraft] = useState({ category: 'General', price: '0', stock: '0', discountPercentage: '0', description: '', images: '' });
   const [busyId, setBusyId] = useState('');
   const meta = resourceMeta[resource]; const Icon = meta.icon;
   const list = queries[resource === 'billing' ? 'invoices' : resource];
@@ -285,14 +506,19 @@ function AdminResourcePage({ resource }: { resource: AdminResource }) {
   const createMutations: any = { products: useCreateProduct(), categories: useCreateCategory(), services: useCreateService(), customers: useCreateCustomer(), orders: useCreateOrder(), requests: useCreateServiceRequest(), reviews: useCreateReview(), inventory: useCreateInventoryItem(), billing: useCreateInvoice(), content: useCreateContentPage() };
   const refreshKey: any = { products: getListProductsQueryKey({ pageSize: 100 }), categories: getListCategoriesQueryKey(), services: getListServicesQueryKey(), customers: getListCustomersQueryKey({ pageSize: 100 }), orders: getListOrdersQueryKey({ pageSize: 100 }), requests: getListServiceRequestsQueryKey({ pageSize: 100 }), reviews: getListReviewsQueryKey(), inventory: getListInventoryQueryKey(), billing: getListInvoicesQueryKey(), content: getListContentPagesQueryKey() }[resource];
   const remove = (id: string) => { setBusyId(id); (deleteMutation as any).mutate({ id }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: refreshKey }); toast({ title: `${meta.title.slice(0, -1) || meta.title} removed` }); setBusyId(''); }, onError: () => { toast({ title: 'Could not remove item', variant: 'destructive' }); setBusyId(''); } }); };
-  const create = () => { if (!name.trim()) return; const data: any = resource === 'products' ? { name, category: 'General', price: 0, stock: 0, image: '', description: '', featured: false } : resource === 'categories' ? { name, slug: name.toLowerCase().replaceAll(' ', '-') } : resource === 'services' ? { name, description: 'New service desk offering', startingPrice: 0, turnaround: 'To confirm', icon: 'briefcase', active: true } : resource === 'customers' ? { name, email: `${name.toLowerCase().replaceAll(' ', '.')}@example.com`, phone: '' } : resource === 'content' ? { key: name.toLowerCase().replaceAll(' ', '-'), title: name, body: '', published: false } : resource === 'offers' ? { code: name.toUpperCase(), title: name, discount: '10%', expiresAt: '', active: true } : { name }; (createMutations as any).mutate({ data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: refreshKey }); toast({ title: `${meta.title.slice(0, -1) || meta.title} created` }); setModal(false); setName(''); }, onError: () => toast({ title: 'Could not create item', variant: 'destructive' }) }); };
+  const resetProductDraft = () => setProductDraft({ category: 'General', price: '0', stock: '0', discountPercentage: '0', description: '', images: '' });
+  const create = () => { if (!name.trim()) return; const normalizedImages = resource === 'products' ? productDraft.images.split(',').map((image) => image.trim()).filter(Boolean) : []; const data: any = resource === 'products' ? { name: name.trim(), category: productDraft.category || 'General', price: Number(productDraft.price) || 0, stock: Number(productDraft.stock) || 0, discountPercentage: Number(productDraft.discountPercentage) || 0, image: normalizedImages[0] || '', images: normalizedImages, description: productDraft.description.trim(), featured: false } : resource === 'categories' ? { name, slug: name.toLowerCase().replaceAll(' ', '-') } : resource === 'services' ? { name, description: 'New service desk offering', startingPrice: 0, turnaround: 'To confirm', icon: 'briefcase', active: true } : resource === 'customers' ? { name, email: `${name.toLowerCase().replaceAll(' ', '.')}@example.com`, phone: '' } : resource === 'content' ? { key: name.toLowerCase().replaceAll(' ', '-'), title: name, body: '', published: false } : resource === 'offers' ? { code: name.toUpperCase(), title: name, discount: '10%', expiresAt: '', active: true } : { name }; (createMutations as any).mutate({ data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: refreshKey }); toast({ title: `${meta.title.slice(0, -1) || meta.title} created` }); setModal(false); setName(''); resetProductDraft(); }, onError: () => toast({ title: 'Could not create item', variant: 'destructive' }) }); };
   const tableHeaders: Record<AdminResource, string[]> = { products: ['Product', 'Category', 'Price', 'Stock', 'Status', ''], categories: ['Category', 'Slug', 'Products', ''], services: ['Service', 'Starting price', 'Turnaround', 'Status', ''], orders: ['Order', 'Customer', 'Total', 'Status', 'Date', ''], customers: ['Customer', 'Contact', 'Orders', 'Status', 'Joined', ''], requests: ['Request', 'Customer', 'Documents', 'Status', 'Due', ''], reviews: ['Product', 'Customer', 'Rating', 'Visibility', 'Date', ''], inventory: ['Product', 'SKU', 'On hand', 'Reserved', 'Status', ''], billing: ['Invoice', 'Customer', 'Amount', 'Status', 'Due', ''], content: ['Page', 'Key', 'Updated', 'Published', ''] };
   const cells = (item: any) => { if (resource === 'products') return [<><div className="font-bold">{item.name}</div><div className="mt-1 text-xs text-muted-foreground">{item.description || 'No description'}</div></>, item.category, money(item.price), item.stock, item.stock > 0 ? 'In stock' : 'Out']; if (resource === 'categories') return [<><div className="font-bold">{item.name}</div><div className="mt-1 text-xs text-muted-foreground">{item.id}</div></>, item.slug, item.productCount, '']; if (resource === 'services') return [<><div className="font-bold">{item.name}</div><div className="mt-1 text-xs text-muted-foreground line-clamp-1">{item.description}</div></>, money(item.startingPrice), item.turnaround, item.active ? 'Active' : 'Paused']; if (resource === 'orders') return [<><div className="font-mono-ui text-xs font-bold">{item.id}</div><div className="mt-1 text-xs text-muted-foreground">{item.items}</div></>, item.customer, money(item.total), item.status, item.date]; if (resource === 'customers') return [<><div className="font-bold">{item.name}</div><div className="mt-1 text-xs text-muted-foreground">{item.id}</div></>, <><div>{item.email}</div><div className="mt-1 text-xs text-muted-foreground">{item.phone}</div></>, item.orders, item.status, item.joinedAt]; if (resource === 'requests') return [<><div className="font-mono-ui text-xs font-bold">{item.reference}</div><div className="mt-1 text-xs text-muted-foreground">{item.service}</div></>, item.customer, item.documents?.length || 0, item.status, item.dueDate || 'TBC']; if (resource === 'reviews') return [item.product, item.customer, <span className="flex items-center gap-1">{item.rating}/5 <Star className="h-3 w-3 fill-accent text-accent-foreground" /></span>, item.visibility, item.date]; if (resource === 'inventory') return [item.product, item.sku, item.onHand, item.reserved, item.status]; if (resource === 'billing') return [<><div className="font-mono-ui text-xs font-bold">{item.number}</div><div className="mt-1 text-xs text-muted-foreground">{item.orderId}</div></>, item.customer, money(item.amount), item.status, item.dueAt]; return [<><div className="font-bold">{item.title}</div><div className="mt-1 text-xs text-muted-foreground">{item.body?.slice(0, 55) || 'No body yet'}</div></>, item.key, item.updatedAt, item.published ? 'Published' : 'Draft']; };
-  return <Shell mode="admin"><PageHeading eyebrow={meta.eyebrow} title={meta.title} body={meta.description} action={<ActionButton onClick={() => setModal(true)} testId={`button-add-${resource}`}><Plus className="h-4 w-4" /> Add {meta.title.slice(0, -1) || meta.title}</ActionButton>} /><div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row"><div className="flex flex-1 gap-2"><SearchBar value={search} onChange={setSearch} placeholder={`Search ${meta.title.toLowerCase()}...`} /><button data-testid="button-filter-toggle" onClick={() => setFilter(filter === 'all' ? 'active' : 'all')} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-bold"><Filter className="h-4 w-4" /> {filter === 'all' ? 'All' : filter}</button></div><div className="flex items-center gap-3 text-xs text-muted-foreground"><span>{rows.length} records</span><button data-testid="button-refresh-list" onClick={() => queryClient.invalidateQueries({ queryKey: refreshKey })} className="rounded-lg p-2 hover:bg-secondary"><RotateCcw className={cx('h-4 w-4', list.isFetching && 'animate-spin')} /></button></div></div>{list.isLoading ? <SkeletonRows count={7} /> : rows.length ? <div className="overflow-hidden rounded-2xl border border-border bg-card"><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="border-b border-border bg-secondary/40 text-[10px] uppercase tracking-[.14em] text-muted-foreground"><tr>{tableHeaders[resource].map((header) => <th key={header} className="px-5 py-4">{header}</th>)}</tr></thead><tbody>{rows.map((item: any) => <tr key={item.id} data-testid={`row-${resource}-${item.id}`} className="group border-b border-border last:border-0 hover:bg-secondary/30">{cells(item).map((cell, index) => <td key={index} className="px-5 py-4 text-muted-foreground">{index === 0 ? <div className="text-foreground">{cell}</div> : index === tableHeaders[resource].length - 2 ? <Status value={String(cell)} /> : cell}</td>)}<td className="px-5 py-4 text-right"><button data-testid={`button-view-${resource}-${item.id}`} className="mr-1 rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"><Eye className="h-4 w-4" /></button><button data-testid={`button-delete-${resource}-${item.id}`} disabled={busyId === item.id} onClick={() => remove(item.id)} className="rounded-lg p-2 text-muted-foreground hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:hover:bg-red-950"><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody></table></div></div> : <EmptyState title={`No ${meta.title.toLowerCase()} yet`} body="Add your first record to start making the desk useful." action={<ActionButton onClick={() => setModal(true)}><Plus className="h-4 w-4" /> Add one</ActionButton>} />}{modal && <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 p-5 backdrop-blur-sm"><div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"><div className="flex items-start justify-between"><div><div className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Quick add</div><h2 className="mt-2 font-display text-2xl font-bold">New {meta.title.slice(0, -1) || meta.title}</h2></div><button data-testid="button-close-modal" onClick={() => setModal(false)} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary"><X className="h-4 w-4" /></button></div><label className="mt-7 grid gap-2 text-sm font-bold">Name / title<input data-testid="input-quick-add-name" autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && create()} placeholder={`e.g. ${resource === 'products' ? 'Premium card stock' : resource === 'services' ? 'Document scanning' : 'New record'}`} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary" /></label><div className="mt-7 flex justify-end gap-2"><ActionButton variant="outline" onClick={() => setModal(false)}>Cancel</ActionButton><ActionButton onClick={create} testId="button-submit-quick-add"><Plus className="h-4 w-4" /> Create</ActionButton></div></div></div>}</Shell>;
+  return <Shell mode="admin"><PageHeading eyebrow={meta.eyebrow} title={meta.title} body={meta.description} action={<ActionButton onClick={() => { if (resource === 'products') { resetProductDraft(); } setModal(true); }} testId={`button-add-${resource}`}><Plus className="h-4 w-4" /> Add {meta.title.slice(0, -1) || meta.title}</ActionButton>} /><div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row"><div className="flex flex-1 gap-2"><SearchBar value={search} onChange={setSearch} placeholder={`Search ${meta.title.toLowerCase()}...`} /><button data-testid="button-filter-toggle" onClick={() => setFilter(filter === 'all' ? 'active' : 'all')} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-bold"><Filter className="h-4 w-4" /> {filter === 'all' ? 'All' : filter}</button></div><div className="flex items-center gap-3 text-xs text-muted-foreground"><span>{rows.length} records</span><button data-testid="button-refresh-list" onClick={() => queryClient.invalidateQueries({ queryKey: refreshKey })} className="rounded-lg p-2 hover:bg-secondary"><RotateCcw className={cx('h-4 w-4', list.isFetching && 'animate-spin')} /></button></div></div>{list.isLoading ? <SkeletonRows count={7} /> : rows.length ? <div className="overflow-hidden rounded-2xl border border-border bg-card"><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="border-b border-border bg-secondary/40 text-[10px] uppercase tracking-[.14em] text-muted-foreground"><tr>{tableHeaders[resource].map((header) => <th key={header} className="px-5 py-4">{header}</th>)}</tr></thead><tbody>{rows.map((item: any) => <tr key={item.id} data-testid={`row-${resource}-${item.id}`} className="group border-b border-border last:border-0 hover:bg-secondary/30">{cells(item).map((cell, index) => <td key={index} className="px-5 py-4 text-muted-foreground">{index === 0 ? <div className="text-foreground">{cell}</div> : index === tableHeaders[resource].length - 2 ? <Status value={String(cell)} /> : cell}</td>)}<td className="px-5 py-4 text-right"><button data-testid={`button-view-${resource}-${item.id}`} className="mr-1 rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"><Eye className="h-4 w-4" /></button><button data-testid={`button-delete-${resource}-${item.id}`} disabled={busyId === item.id} onClick={() => remove(item.id)} className="rounded-lg p-2 text-muted-foreground hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:hover:bg-red-950"><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody></table></div></div> : <EmptyState title={`No ${meta.title.toLowerCase()} yet`} body="Add your first record to start making the desk useful." action={<ActionButton onClick={() => { if (resource === 'products') { resetProductDraft(); } setModal(true); }}><Plus className="h-4 w-4" /> Add one</ActionButton>} />}{modal && <div className="fixed inset-0 z-50 grid place-items-center bg-primary/30 p-5 backdrop-blur-sm"><div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl"><div className="flex items-start justify-between"><div><div className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Quick add</div><h2 className="mt-2 font-display text-2xl font-bold">New {meta.title.slice(0, -1) || meta.title}</h2></div><button data-testid="button-close-modal" onClick={() => setModal(false)} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary"><X className="h-4 w-4" /></button></div>{resource === 'products' ? <div className="mt-6 grid gap-4"><label className="grid gap-2 text-sm font-bold">Category<select value={productDraft.category} onChange={(event) => setProductDraft((current) => ({ ...current, category: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"><option>General</option><option>Printers</option><option>Mobile Accessories</option><option>Computer Accessories</option><option>Printing Supplies</option></select></label><label className="grid gap-2 text-sm font-bold">Product Name<input data-testid="input-quick-add-name" autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && create()} placeholder="Premium card stock" className="h-11 rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary" /></label><div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm font-bold">Product Price<input type="number" min="0" value={productDraft.price} onChange={(event) => setProductDraft((current) => ({ ...current, price: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary" /></label><label className="grid gap-2 text-sm font-bold">Stock Quantity<input type="number" min="0" value={productDraft.stock} onChange={(event) => setProductDraft((current) => ({ ...current, stock: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary" /></label></div><label className="grid gap-2 text-sm font-bold">Discount Percentage<input type="number" min="0" max="100" value={productDraft.discountPercentage} onChange={(event) => setProductDraft((current) => ({ ...current, discountPercentage: event.target.value }))} className="h-11 rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary" /></label><label className="grid gap-2 text-sm font-bold">Product Description<textarea value={productDraft.description} onChange={(event) => setProductDraft((current) => ({ ...current, description: event.target.value }))} rows={4} className="rounded-xl border border-border bg-background p-3 text-sm font-normal outline-none focus:border-primary" /></label><label className="grid gap-2 text-sm font-bold">Product Images<input value={productDraft.images} onChange={(event) => setProductDraft((current) => ({ ...current, images: event.target.value }))} placeholder="https://..., https://..." className="h-11 rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary" /></label></div> : <label className="mt-7 grid gap-2 text-sm font-bold">Name / title<input data-testid="input-quick-add-name" autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && create()} placeholder={`e.g. ${resource === 'services' ? 'Document scanning' : 'New record'}`} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary" /></label>}<div className="mt-7 flex justify-end gap-2"><ActionButton variant="outline" onClick={() => setModal(false)}>Cancel</ActionButton><ActionButton onClick={create} testId="button-submit-quick-add"><Plus className="h-4 w-4" /> Create</ActionButton></div></div></div>}</Shell>;
 }
 
 function ProductImage({ product, large = false }: { product: any; large?: boolean }) {
-  return <div className={cx('flex items-center justify-center overflow-hidden rounded-xl bg-secondary', large ? 'min-h-[280px] sm:min-h-[340px]' : 'h-36 sm:h-40')}><div className="text-center"><Package className={cx('mx-auto text-muted-foreground', large ? 'h-16 w-16 sm:h-20 sm:w-20' : 'h-10 w-10')} /><div className="mt-2 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">{product.image || 'product image'}</div></div></div>;
+  const images = Array.isArray(product?.images) ? product.images.filter(Boolean) : typeof product?.image === 'string' && product.image.includes(',') ? product.image.split(',').map((image: string) => image.trim()).filter(Boolean) : product?.image ? [product.image] : [];
+  const src = images[0] || product?.image || '';
+  return <div className={cx('flex items-center justify-center overflow-hidden rounded-xl bg-secondary', large ? 'min-h-[280px] sm:min-h-[340px]' : 'h-36 sm:h-40')}>
+    {src ? <img src={src} alt={product?.name || 'Product'} className="h-full w-full object-cover" /> : <div className="text-center"><Package className={cx('mx-auto text-muted-foreground', large ? 'h-16 w-16 sm:h-20 sm:w-20' : 'h-10 w-10')} /><div className="mt-2 text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">{product?.image || 'product image'}</div></div>}
+  </div>;
 }
 
 function StoreButton({ children, onClick, variant = 'primary' }: { children: ReactNode; onClick?: () => void; variant?: 'primary' | 'outline' }) {
@@ -312,13 +538,98 @@ function ProductDetails() {
   const { addToCart, addToWishlist } = useCart();
   const [, setLocation] = useLocation();
   const product = (products.data?.items || []).find((item: any) => item.id === params?.id) as any;
+
   if (products.isLoading) return <Shell mode="portal"><SkeletonRows count={4} /></Shell>;
   if (!product) return <Shell mode="portal"><EmptyState title="Product not found" body="This item may have moved off the shelf." action={<StoreButton onClick={() => setLocation('/portal/catalog')}>Back to catalog</StoreButton>} /></Shell>;
-  const discount = product.originalPrice ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
-  const related = (products.data?.items || []).filter((item: any) => item.id !== product.id && (product.related || []).includes(item.id));
-  return <Shell mode="portal"><button onClick={() => setLocation('/portal/catalog')} className="mb-6 text-sm font-bold text-muted-foreground hover:text-foreground">← Back to catalog</button><div className="grid gap-8 xl:grid-cols-[.9fr_1.1fr]"><section><ProductImage product={product} large /><div className="mt-3 grid grid-cols-4 gap-3">{(product.images || [product.image]).map((image: string, index: number) => <div key={`${image}-${index}`} className="grid h-20 place-items-center rounded-xl border border-border bg-secondary text-[10px] font-bold uppercase text-muted-foreground">{image}</div>)}</div></section><section><div className="flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[.14em] text-muted-foreground"><span>{product.brand}</span><span>·</span><span>{product.category}</span></div><h1 className="mt-3 font-display text-4xl font-bold tracking-tight">{product.name}</h1><div className="mt-3 flex flex-wrap items-center gap-3 text-sm"><span className="font-bold text-amber-600">★ {product.rating}</span><span className="text-muted-foreground">{product.reviews} reviews</span><span className="font-mono-ui text-xs text-muted-foreground">SKU {product.sku}</span></div><p className="mt-6 leading-7 text-muted-foreground">{product.description}</p><div className="mt-7 flex items-end gap-3"><span className="text-3xl font-bold">{money(product.price)}</span><span className="text-lg text-muted-foreground line-through">{money(product.originalPrice)}</span><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">{discount}% off</span></div><p className="mt-2 text-sm font-semibold text-emerald-700">You save {money(product.savings || product.originalPrice - product.price)} · {product.stock > 0 ? `${product.stock} available` : 'Out of stock'}</p><p className="mt-3 text-sm text-muted-foreground">{product.deliveryAvailable ? `Delivery available in ${product.deliveryDays} days` : 'Delivery unavailable'}</p><div className="mt-7 flex flex-wrap gap-3"><StoreButton onClick={() => void addToCart(product.id)}><ShoppingBag className="h-4 w-4" /> Add to cart</StoreButton><StoreButton variant="outline" onClick={() => { void addToCart(product.id); setLocation('/portal/cart'); }}>Buy now</StoreButton><button aria-label="Add to wishlist" onClick={() => void addToWishlist(product.id)} className="rounded-xl border border-border px-4 text-sm font-bold">♡ Wishlist</button><button aria-label="Share product" onClick={() => void navigator.clipboard?.writeText(window.location.href)} className="rounded-xl border border-border px-4 text-sm font-bold">Share</button></div></section></div><div className="mt-12 grid gap-6 xl:grid-cols-2"><section className="rounded-2xl border border-border bg-card p-6"><h2 className="font-display text-2xl font-bold">Specifications</h2><div className="mt-4 divide-y divide-border">{Object.entries(product.specifications || {}).map(([key, value]) => <div key={key} className="grid grid-cols-2 gap-4 py-3 text-sm"><span className="font-semibold">{key}</span><span className="text-muted-foreground">{String(value)}</span></div>)}</div></section><section className="space-y-6"><div className="rounded-2xl border border-border bg-card p-6"><h2 className="font-display text-2xl font-bold">Features & benefits</h2><ul className="mt-4 grid gap-3 text-sm text-muted-foreground">{[...(product.features || []), ...(product.benefits || [])].map((item: string) => <li key={item}>✓ {item}</li>)}</ul></div><div className="rounded-2xl border border-border bg-card p-6 text-sm"><h2 className="font-display text-2xl font-bold">What's included</h2><ul className="mt-4 grid gap-2 text-muted-foreground">{(product.inclusions || []).map((item: string) => <li key={item}>• {item}</li>)}</ul><p className="mt-5"><strong>Warranty:</strong> {product.warranty}</p><p className="mt-3"><strong>Returns:</strong> {product.returnPolicy}</p></div></section></div><section className="mt-8 rounded-2xl border border-border bg-card p-6"><h2 className="font-display text-2xl font-bold">Frequently asked questions</h2><div className="mt-4 grid gap-4 md:grid-cols-2">{(product.faqs || []).map((faq: any) => <div key={faq.question}><div className="font-bold">{faq.question}</div><p className="mt-1 text-sm text-muted-foreground">{faq.answer}</p></div>)}</div></section>{related.length > 0 && <section className="mt-8"><h2 className="font-display text-2xl font-bold">Related products</h2><div className="mt-4 grid gap-4 sm:grid-cols-3">{related.map((item: any) => <button key={item.id} onClick={() => setLocation(`/portal/products/${item.id}`)} className="rounded-2xl border border-border bg-card p-4 text-left"><ProductImage product={item} /><div className="mt-3 font-bold">{item.name}</div><div className="mt-1 text-sm text-muted-foreground">{money(item.price)}</div></button>)}</div></section>}</Shell>;
-}
 
+  const discount = getProductDiscountPercent(product);
+  const finalPrice = getProductFinalPrice(product);
+  const related = (products.data?.items || []).filter((item: any) => item.id !== product.id && item.category === product.category).slice(0, 4);
+  const images = Array.isArray(product.images)
+    ? product.images.filter(Boolean)
+    : typeof product.image === 'string' && product.image.includes(',')
+      ? product.image.split(',').map((image: string) => image.trim()).filter(Boolean)
+      : product.image
+        ? [product.image]
+        : [];
+
+  return (
+    <Shell mode="portal">
+      <button onClick={() => setLocation('/portal/catalog')} className="mb-6 text-sm font-bold text-muted-foreground hover:text-foreground">
+        ? Back to catalog
+      </button>
+
+      <div className="grid gap-8 xl:grid-cols-[.9fr_1.1fr]">
+        <section>
+          <ProductImage product={product} large />
+          <div className="mt-3 grid grid-cols-4 gap-3">
+            {images.map((image: string, index: number) => (
+              <div key={`${image}-${index}`} className="grid h-20 place-items-center overflow-hidden rounded-xl border border-border bg-secondary">
+                <img src={image} alt={`${product.name} ${index + 1}`} className="h-full w-full object-cover" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">
+            <span>{product.category}</span>
+          </div>
+
+          <h1 className="mt-3 font-display text-4xl font-bold tracking-tight">{product.name}</h1>
+
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+            <span className="font-bold text-amber-600">? {product.rating ?? 4.5}</span>
+            <span className="text-muted-foreground">{product.reviews ?? 0} reviews</span>
+          </div>
+
+          <p className="mt-6 leading-7 text-muted-foreground">{product.description}</p>
+
+          <div className="mt-7 space-y-2">
+            <div className="flex items-end gap-3">
+              <span className="text-lg text-muted-foreground line-through">{money(Number(product.price) || 0)}</span>
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">{discount}% off</span>
+            </div>
+            <div className="text-3xl font-bold">{money(finalPrice)}</div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <StoreButton onClick={() => void addToCart(product.id)}><Plus className="h-4 w-4" /> Add to cart</StoreButton>
+            <button onClick={() => void addToWishlist(product.id)} className="rounded-xl border border-border bg-card px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary">
+              Save for later
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-2 text-sm text-muted-foreground">
+            <div><span className="font-semibold text-foreground">Price:</span> {money(Number(product.price) || 0)}</div>
+            <div><span className="font-semibold text-foreground">Discount:</span> {discount}%</div>
+            <div><span className="font-semibold text-foreground">Final price:</span> {money(finalPrice)}</div>
+            <div><span className="font-semibold text-foreground">Available stock:</span> {product.stock > 0 ? `${product.stock} units` : 'Out of stock'}</div>
+          </div>
+        </section>
+      </div>
+
+      {related.length > 0 && (
+        <section className="mt-10">
+          <h2 className="font-display text-2xl font-bold">Related products</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {related.map((item: any) => (
+              <button
+                key={item.id}
+                onClick={() => setLocation(`/portal/products/${item.id}`)}
+                className="rounded-2xl border border-border bg-card p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <ProductImage product={item} />
+                <div className="mt-3 font-bold">{item.name}</div>
+                <div className="mt-1 text-sm text-muted-foreground">{money(Number(item.price) || 0)}</div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+    </Shell>
+  );
+}
 function PriceBreakdown({ breakdown }: { breakdown: any }) {
   if (!breakdown) return <SkeletonRows count={6} />;
   const rows = [['Subtotal', breakdown.subtotal], ['Discount', -breakdown.discount], ['Coupon discount', -breakdown.couponDiscount], ['Platform discount', -breakdown.platformDiscount], ['Delivery charge', breakdown.deliveryCharge], ['Packaging charge', breakdown.packagingCharge], ['Tax/GST', breakdown.tax]];
@@ -378,7 +689,7 @@ function CommerceCatalogPage() {
 
 function AppRoutes() {
   const [location] = useLocation();
-  return <Switch><Route path="/" component={RoleSelection} /><Route path="/portal" component={CustomerOverviewLegacy} /><Route path="/portal/catalog" component={CommerceCatalogPage} /><Route path="/portal/products/:id" component={ProductDetailsCompact} /><Route path="/portal/cart" component={CartPage} /><Route path="/portal/checkout" component={CheckoutPage} /><Route path="/portal/order/:id" component={OrderConfirmation} /><Route path="/portal/orders" component={OrderHistoryPage} /><Route path="/portal/notifications" component={NotificationsPage} /><Route path="/portal/services" component={PortalServices} /><Route path="/portal/requests/new" component={NewRequest} /><Route path="/portal/requests"><PortalListPage kind="requests" /></Route><Route path="/admin" component={AdminDashboard} /><Route path="/admin/orders" component={AdminOrdersPage} />{(Object.keys(resourceMeta) as AdminResource[]).map((resource) => <Route key={resource} path={`/admin/${resource}`}><AdminResourcePage resource={resource} /></Route>)}<Route><div data-testid="not-found-route" className="grid min-h-[100dvh] place-items-center bg-background p-6"><div className="text-center"><div className="font-mono-ui text-xs text-muted-foreground">404 / off the line</div><h1 className="mt-3 font-display text-4xl font-bold">That page is not here.</h1><Link href="/" data-testid="link-back-home" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Back to Star Line <ArrowRight className="h-4 w-4" /></Link></div></div></Route></Switch>;
+  return <Switch><Route path="/" component={RoleSelection} /><Route path="/portal" component={CustomerOverviewLegacy} /><Route path="/portal/catalog" component={CommerceCatalogPage} /><Route path="/portal/products/:id" component={ProductDetailsCompact} /><Route path="/portal/cart" component={CartPage} /><Route path="/portal/checkout" component={CheckoutPage} /><Route path="/portal/order/:id" component={OrderConfirmation} /><Route path="/portal/orders" component={OrderHistoryPage} /><Route path="/portal/notifications" component={NotificationsPage} /><Route path="/portal/services" component={PortalServices} /><Route path="/portal/requests/new" component={NewRequest} /><Route path="/portal/requests"><PortalListPage kind="requests" /></Route><Route path="/admin" component={AdminDashboard} /><Route path="/admin/orders" component={AdminOrdersPage} /><Route path="/admin/settings" component={SettingsPage} />{(Object.keys(resourceMeta) as AdminResource[]).map((resource) => <Route key={resource} path={`/admin/${resource}`}><AdminResourcePage resource={resource} /></Route>)}<Route><div data-testid="not-found-route" className="grid min-h-[100dvh] place-items-center bg-background p-6"><div className="text-center"><div className="font-mono-ui text-xs text-muted-foreground">404 / off the line</div><h1 className="mt-3 font-display text-4xl font-bold">That page is not here.</h1><Link href="/" data-testid="link-back-home" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Back to Star Line <ArrowRight className="h-4 w-4" /></Link></div></div></Route></Switch>;
 }
 
 function App() {

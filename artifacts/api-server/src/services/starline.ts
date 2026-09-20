@@ -89,7 +89,7 @@ class StarlineService {
     const maxStock = Number(product.stock ?? 0);
     const price = Number(product.price ?? 0);
     const originalPrice = Number(product.originalPrice ?? price);
-    const existing = this.data.cart.find((item) => item.id === productId);
+    const existing = this.data.cart.find((item) => item.productId === productId);
     if (existing) {
       const nextQty = Math.min(existing.quantity + quantity, maxStock);
       existing.quantity = nextQty;
@@ -136,7 +136,7 @@ class StarlineService {
   addToWishlist(productId: string) {
     const product = this.find("products", productId) as Record<string, unknown> | undefined;
     if (!product) return { error: "Product not found" };
-    const existing = this.data.wishlist.find((item) => item.id === productId);
+    const existing = this.data.wishlist.find((item) => item.productId === productId);
     if (existing) return existing;
     const item = {
       id: `wish-${Date.now()}`,

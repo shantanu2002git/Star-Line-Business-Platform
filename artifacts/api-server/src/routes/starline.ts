@@ -121,6 +121,15 @@ router.get("/orders", (req, res) => {
   const customer = typeof req.query.customer === "string" ? req.query.customer : undefined;
   return res.json(starlineService.listOrders(customer));
 });
+router.post("/orders", (req, res) => {
+  const item = starlineService.create("orders", req.body as Record<string, unknown>);
+  return res.status(201).json(item);
+});
+router.patch("/orders/:id", (req, res) => {
+  const item = starlineService.updateOrder(String(req.params.id), req.body as Record<string, unknown>);
+  return item ? res.json(item) : res.status(404).json({ error: "Order not found" });
+});
+router.delete("/orders/:id", remove("orders"));
 
 router.get("/categories", list("categories"));
 router.post("/categories", create("categories"));
@@ -136,14 +145,6 @@ router.get("/customers", list("customers", true));
 router.post("/customers", create("customers"));
 router.patch("/customers/:id", update("customers"));
 router.delete("/customers/:id", remove("customers"));
-
-router.get("/orders", list("orders", true));
-router.post("/orders", create("orders"));
-router.patch("/orders/:id", (req, res) => {
-  const item = starlineService.updateOrder(String(req.params.id), req.body as Record<string, unknown>);
-  return item ? res.json(item) : res.status(404).json({ error: "Order not found" });
-});
-router.delete("/orders/:id", remove("orders"));
 
 router.get("/requests", list("requests", true));
 router.post("/requests", create("requests"));
