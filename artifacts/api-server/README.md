@@ -37,6 +37,15 @@ routes `/api` and `/api/*` to it. Configure `MONGODB_URI` and, optionally,
 when a request reaches it, which supports Vercel's function runtime as well as
 the existing local server entrypoint.
 
+## Render
+
+The root `render.yaml` deploys a single Node web service. Its build installs
+the workspace, builds the Star Line static frontend and API, and its Express
+server serves both the frontend routes and `/api/*` from the same origin.
+Render injects `PORT`; add `MONGODB_URI` as a secret when creating the
+Blueprint. `MONGODB_DATABASE` defaults to `star-line`. The service health check
+uses `/api/healthz`.
+
 Cart, wishlist, customer, order, service request, review, invoice, and
 notification records are associated with an opaque, HTTP-only browser session
 cookie. This provides persistence and separation for anonymous browser

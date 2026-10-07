@@ -3,6 +3,9 @@ import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createHash, randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import pinoHttp from "pino-http";
 import { connectDatabase, mongoose } from "@workspace/db";
 import router from "./routes";
@@ -75,14 +78,34 @@ app.use("/api", async (_req, _res, next) => {
 
 app.use("/api", router);
 
-app.get("/", (_req, res) => {
-  res.json({
-    name: "Star Line Business Platform API",
-    version: "0.0.0",
-    health: "/api/healthz",
-    docs: "/api",
+const frontendDirectory = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "star-line",
+  "dist",
+  "public",
+);
+const frontendIndex = path.join(frontendDirectory, "index.html");
+
+if (existsSync(frontendIndex)) {
+  app.use(express.static(frontendDirectory, { index: false }));
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ error: "API route not found." });
   });
-});
+  app.get(/^(?!\/api(?:\/|$)).*/, (_req, res) => {
+    res.sendFile(frontendIndex);
+  });
+} else {
+  app.get("/", (_req, res) => {
+    res.json({
+      name: "Star Line Business Platform API",
+      version: "0.0.0",
+      health: "/api/healthz",
+      docs: "/api",
+    });
+  });
+}
 
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
