@@ -21,4 +21,5 @@ page?: PageParameter;
  */
 pageSize?: PageSizeParameter;
 status?: string;
+mine?: boolean;
 };

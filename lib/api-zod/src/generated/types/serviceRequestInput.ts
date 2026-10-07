@@ -9,6 +9,7 @@ import type { Document } from './document';
 
 export interface ServiceRequestInput {
   customer: string;
+  email?: string;
   service: string;
   dueDate?: string;
   documents: Document[];

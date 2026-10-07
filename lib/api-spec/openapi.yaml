@@ -339,6 +339,9 @@ paths:
         - name: status
           in: query
           schema: { type: string }
+        - name: mine
+          in: query
+          schema: { type: boolean }
       responses:
         "200":
           description: Request list
@@ -393,6 +396,9 @@ paths:
         - name: visibility
           in: query
           schema: { type: string }
+        - name: mine
+          in: query
+          schema: { type: boolean }
       responses:
         "200":
           description: Review list
@@ -495,6 +501,10 @@ paths:
       operationId: listInvoices
       tags: [billing]
       summary: List invoices
+      parameters:
+        - name: mine
+          in: query
+          schema: { type: boolean }
       responses:
         "200":
           description: Invoice list
@@ -520,6 +530,21 @@ paths:
               schema: { $ref: "#/components/schemas/Invoice" }
   /invoices/{id}:
     parameters: [{ $ref: "#/components/parameters/Id" }]
+    patch:
+      operationId: updateInvoice
+      tags: [billing]
+      summary: Update an invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvoiceInput" }
+      responses:
+        "200":
+          description: Updated invoice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
     delete:
       operationId: deleteInvoice
       tags: [billing]
@@ -841,6 +866,7 @@ components:
       required: [customer, service, documents, notes]
       properties:
         customer: { type: string }
+        email: { type: string, format: email }
         service: { type: string }
         dueDate: { type: string }
         documents:

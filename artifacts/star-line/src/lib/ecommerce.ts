@@ -49,6 +49,7 @@ export type OrderItem = {
 export type Order = {
   id: string;
   number: string;
+  invoiceNumber?: string;
   customer: string;
   email: string;
   phone: string;
@@ -160,15 +161,17 @@ export function getOrder(id: string) {
   return customFetch<Order>(`/api/orders/${id}`, { responseType: 'json' });
 }
 
-export function listOrders(customer?: string) {
-  return customFetch<Order[]>(
-    customer ? `/api/orders?customer=${encodeURIComponent(customer)}` : '/api/orders',
-    { responseType: 'json' },
-  );
+export function listOrders(customer?: string, mine = false) {
+  const params = new URLSearchParams();
+  if (customer) params.set('customer', customer);
+  else if (mine) params.set('mine', 'true');
+  else params.set('format', 'array');
+  return customFetch<Order[]>(`/api/orders?${params}`, { responseType: 'json' });
 }
 
-export function listNotifications(customer = 'Ananya Shah') {
-  return customFetch<Notification[]>(`/api/notifications?customer=${encodeURIComponent(customer)}`, { responseType: 'json' });
+export function listNotifications(customer?: string) {
+  const query = customer ? `?customer=${encodeURIComponent(customer)}` : '';
+  return customFetch<Notification[]>(`/api/notifications${query}`, { responseType: 'json' });
 }
 
 export function markNotificationRead(id: string) {

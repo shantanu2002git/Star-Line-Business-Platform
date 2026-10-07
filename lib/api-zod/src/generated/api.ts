@@ -566,7 +566,8 @@ export const ListServiceRequestsQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
   "page": zod.coerce.number().int().min(1).default(listServiceRequestsQueryPageDefault),
   "pageSize": zod.coerce.number().int().min(1).max(listServiceRequestsQueryPageSizeMax).default(listServiceRequestsQueryPageSizeDefault),
-  "status": zod.coerce.string().optional()
+  "status": zod.coerce.string().optional(),
+  "mine": zod.coerce.boolean().optional()
 })
 
 export const ListServiceRequestsResponse = zod.object({
@@ -605,6 +606,7 @@ export const createServiceRequestBodyAmountMin = 0;
 
 export const CreateServiceRequestBody = zod.object({
   "customer": zod.string(),
+  "email": zod.string().email().optional(),
   "service": zod.string(),
   "dueDate": zod.string().optional(),
   "documents": zod.array(zod.object({
@@ -688,7 +690,8 @@ export const DeleteServiceRequestResponse = zod.void()
  */
 export const ListReviewsQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
-  "visibility": zod.coerce.string().optional()
+  "visibility": zod.coerce.string().optional(),
+  "mine": zod.coerce.boolean().optional()
 })
 
 export const listReviewsResponseRatingMax = 5;
@@ -873,6 +876,10 @@ export const DeleteInventoryItemResponse = zod.void()
 /**
  * @summary List invoices
  */
+export const ListInvoicesQueryParams = zod.object({
+  "mine": zod.coerce.boolean().optional()
+})
+
 export const ListInvoicesResponseItem = zod.object({
   "id": zod.string(),
   "number": zod.string(),
@@ -901,6 +908,36 @@ export const CreateInvoiceBody = zod.object({
 })
 
 export const CreateInvoiceResponse = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "customer": zod.string(),
+  "orderId": zod.string(),
+  "amount": zod.number(),
+  "status": zod.string(),
+  "issuedAt": zod.string(),
+  "dueAt": zod.string()
+})
+
+
+/**
+ * @summary Update an invoice
+ */
+export const UpdateInvoiceParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateInvoiceBodyAmountMin = 0;
+
+
+
+export const UpdateInvoiceBody = zod.object({
+  "customer": zod.string(),
+  "orderId": zod.string(),
+  "amount": zod.number().min(updateInvoiceBodyAmountMin),
+  "dueAt": zod.string()
+})
+
+export const UpdateInvoiceResponse = zod.object({
   "id": zod.string(),
   "number": zod.string(),
   "customer": zod.string(),

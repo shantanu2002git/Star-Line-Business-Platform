@@ -5,10 +5,7 @@
  * Star Line business platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { SearchParameter } from './searchParameter';
 
-export type ListReviewsParams = {
-search?: SearchParameter;
-visibility?: string;
+export type ListInvoicesParams = {
 mine?: boolean;
 };

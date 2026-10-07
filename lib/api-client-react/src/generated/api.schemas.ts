@@ -135,6 +135,7 @@ export interface ServiceRequest {
 
 export interface ServiceRequestInput {
   customer: string;
+  email?: string;
   service: string;
   dueDate?: string;
   documents: Document[];
@@ -401,10 +402,16 @@ page?: PageParameter;
  */
 pageSize?: PageSizeParameter;
 status?: string;
+mine?: boolean;
 };
 
 export type ListReviewsParams = {
 search?: SearchParameter;
 visibility?: string;
+mine?: boolean;
+};
+
+export type ListInvoicesParams = {
+mine?: boolean;
 };
 

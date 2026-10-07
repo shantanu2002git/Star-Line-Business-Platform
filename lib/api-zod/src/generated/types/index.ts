@@ -30,6 +30,7 @@ export * from './inventoryUpdate';
 export * from './invoice';
 export * from './invoiceInput';
 export * from './listCustomersParams';
+export * from './listInvoicesParams';
 export * from './listOrdersParams';
 export * from './listProductsParams';
 export * from './listReviewsParams';

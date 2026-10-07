@@ -11,6 +11,12 @@ out-tsc
 # dependencies
 node_modules
 
+# Local credentials and environment overrides
+/.env
+/.env.*
+!/.env.example
+/artifacts/api-server/.env
+
 # IDEs and editors
 /.idea
 .project
