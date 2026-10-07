@@ -1,12 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
-    "api-server": {
-      "root": "artifacts/api-server",
-      "framework": "express",
-      "entrypoint": "src/app.ts",
-      "buildCommand": "pnpm run build"
-    },
     "mockup-sandbox": {
       "root": "artifacts/mockup-sandbox",
       "framework": "vite",
@@ -23,15 +17,11 @@
   "rewrites": [
     {
       "source": "/api",
-      "destination": {
-        "service": "api-server"
-      }
+      "destination": "https://star-line-business-platform.onrender.com/api"
     },
     {
       "source": "/api/(.*)",
-      "destination": {
-        "service": "api-server"
-      }
+      "destination": "https://star-line-business-platform.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",
