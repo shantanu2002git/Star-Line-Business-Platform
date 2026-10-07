@@ -1,0 +1,43 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api-server": {
+      "root": "artifacts/api-server",
+      "framework": "express",
+      "entrypoint": "src/app.ts",
+      "buildCommand": "pnpm run build"
+    },
+    "mockup-sandbox": {
+      "root": "artifacts/mockup-sandbox",
+      "framework": "vite",
+      "buildCommand": "pnpm run build",
+      "outputDirectory": "dist"
+    },
+    "star-line": {
+      "root": "artifacts/star-line",
+      "framework": "vite",
+      "buildCommand": "pnpm run build",
+      "outputDirectory": "dist/public"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api",
+      "destination": {
+        "service": "api-server"
+      }
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "api-server"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "star-line"
+      }
+    }
+  ]
+}

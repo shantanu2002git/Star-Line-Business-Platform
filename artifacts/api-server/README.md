@@ -29,6 +29,14 @@ The API waits for a successful MongoDB connection before listening. Check
 validate documents with Mongoose schemas, and return empty collections until
 records are created through the API.
 
+## Vercel services
+
+The root `vercel.json` deploys this Express API as the `api-server` service and
+routes `/api` and `/api/*` to it. Configure `MONGODB_URI` and, optionally,
+`MONGODB_DATABASE` as Vercel environment variables. The API connects lazily
+when a request reaches it, which supports Vercel's function runtime as well as
+the existing local server entrypoint.
+
 Cart, wishlist, customer, order, service request, review, invoice, and
 notification records are associated with an opaque, HTTP-only browser session
 cookie. This provides persistence and separation for anonymous browser

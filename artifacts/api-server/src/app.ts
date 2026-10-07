@@ -4,7 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createHash, randomBytes } from "node:crypto";
 import pinoHttp from "pino-http";
-import mongoose from "mongoose";
+import { connectDatabase, mongoose } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { ApiError } from "./services/starline";
@@ -62,6 +62,15 @@ app.use((req, res, next) => {
   }
   req.sessionId = createHash("sha256").update(token).digest("hex");
   next();
+});
+
+app.use("/api", async (_req, _res, next) => {
+  try {
+    await connectDatabase();
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.use("/api", router);
