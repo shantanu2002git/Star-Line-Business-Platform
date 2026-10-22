@@ -13,6 +13,7 @@ import { logger } from "./lib/logger";
 import { ApiError } from "./services/starline";
 import { securityHeadersMiddleware } from "./middlewares/securityHeaders";
 import { applyRateLimiting } from "./middlewares/rateLimiter";
+import { securityLoggingMiddleware } from "./middlewares/securityLogger";
 
 const app: Express = express();
 
@@ -75,6 +76,9 @@ app.use((req, res, next) => {
 
 // Rate limiting middleware (applied before routes)
 app.use("/api", applyRateLimiting);
+
+// Security logging middleware (attack detection, audit trail, auth logging)
+app.use("/api", ...securityLoggingMiddleware());
 
 app.use("/api", async (_req, _res, next) => {
   try {
