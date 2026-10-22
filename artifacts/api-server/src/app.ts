@@ -11,6 +11,7 @@ import { connectDatabase, mongoose } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { ApiError } from "./services/starline";
+import { securityHeadersMiddleware } from "./middlewares/securityHeaders";
 
 const app: Express = express();
 
@@ -33,6 +34,10 @@ app.use(
     },
   }),
 );
+
+// Security headers (Helmet + CSP + additional headers)
+app.use(...securityHeadersMiddleware());
+
 const allowedOrigins = process.env.FRONTEND_ORIGIN
   ?.split(",")
   .map((origin) => origin.trim())
