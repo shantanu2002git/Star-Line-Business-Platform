@@ -22,9 +22,6 @@ export function connectDatabase(): Promise<void> {
       ...(process.env.MONGODB_DATABASE
         ? { dbName: process.env.MONGODB_DATABASE }
         : {}),
-      tls: true,
-      tlsAllowInvalidCertificates: false,
-      tlsAllowInvalidHostnames: false,
       serverSelectionTimeoutMS: 10_000,
       autoIndex: process.env.NODE_ENV !== "production",
     });
