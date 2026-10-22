@@ -29,6 +29,29 @@ The API waits for a successful MongoDB connection before listening. Check
 validate documents with Mongoose schemas, and return empty collections until
 records are created through the API.
 
+### Local MongoDB with Docker Desktop (PowerShell)
+
+Start Docker Desktop, then run this once to create a persistent local database:
+
+```powershell
+docker run -d --name star-line-mongodb -p 27017:27017 -v star-line-mongo-data:/data/db mongo:8
+```
+
+On later runs, start the existing container with
+`docker start star-line-mongodb`. In the same PowerShell window, point the app
+at it and start both services:
+
+```powershell
+$env:MONGODB_URI = "mongodb://127.0.0.1:27017/star-line"
+$env:MONGODB_DATABASE = "star-line"
+pnpm run dev
+```
+
+The MongoDB driver enables TLS by default for `mongodb+srv://` Atlas URIs and
+uses the connection URI's options for standard `mongodb://` URIs. For Atlas,
+ensure the cluster is running, the credentials are valid, and the current
+network IP is allowed by the cluster's access list.
+
 ## Vercel services
 
 The root `vercel.json` deploys this Express API as the `api-server` service and
