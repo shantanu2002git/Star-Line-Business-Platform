@@ -11,6 +11,7 @@ import { connectDatabase, mongoose } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { ApiError } from "./services/starline";
+import { applyRateLimiting } from "./middlewares/rateLimiter";
 
 const app: Express = express();
 
@@ -66,6 +67,9 @@ app.use((req, res, next) => {
   req.sessionId = createHash("sha256").update(token).digest("hex");
   next();
 });
+
+// Rate limiting middleware (applied before routes)
+app.use("/api", applyRateLimiting);
 
 app.use("/api", async (_req, _res, next) => {
   try {
